@@ -87,13 +87,6 @@ typedef struct {
     size_t cols;
     Cursor crsr;
 } Display;
-
-typedef struct {
-    char *viewbuffer;
-    size_t lines;
-    size_t cols;
-    Cursor crsr;
-} Display;
 Display* display_init(const size_t lines, const size_t cols)
 {
     assert(lines != 0 && cols != 0);
@@ -346,7 +339,7 @@ void handle_go_up(Editor *e, Display *d)
     }
     e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
 }
-void handle_go_up(Editor *e, Display *d)
+void handle_start_search_mode(Editor *e, Display *d)
 {
     e->mode = search;
 }
