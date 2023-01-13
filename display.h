@@ -6,10 +6,16 @@
 #include "editor.h"
 
 typedef struct {
+    size_t lines;
+    size_t cols;
+} Scroll;
+
+typedef struct {
     char *viewbuffer;
     size_t lines;
     size_t cols;
     Cursor crsr;
+    Scroll scrollOffset;
 } Display;
 
 Display* display_init(const size_t lines, const size_t cols);

@@ -29,6 +29,7 @@ Display* display_init(const size_t lines, const size_t cols)
     d->lines = lines;
     d->cols = cols;
     d->crsr = (Cursor){0,0};
+    d->scrollOffset = (Scroll){0,0};
     //fill with blakns
     memset(d->viewbuffer,BLANK, buf_size);
     return d;
@@ -82,40 +83,40 @@ void display_render_editor(Display *d, Editor *e)
     // prepare cursors
     // TODO maybe vieportOffset (scolling offset) ist better located in Display instead of Editor
     //scroll to the right if necessary
-    if(e->crsr.col - e->viewportOffset.col >= d->cols)
+    if(e->crsr.col >= d->scrollOffset.cols + d->cols)
     {
-        if(e->viewportOffset.col + d->cols < e->lines[e->crsr.line].filled_size)
+        if(d->scrollOffset.cols + d->cols < e->lines[e->crsr.line].filled_size)
         {
-            e->viewportOffset.col += 1;
+            d->scrollOffset.cols += 1;
         }
     }
     //scroll to the left if necessary
-    if(e->crsr.col < e->viewportOffset.col)
+    if(e->crsr.col < d->scrollOffset.cols)
     {
-        e->viewportOffset.col -= 1;
+        d->scrollOffset.cols -= 1;
     }
     // scroll down
     if(e->crsr.line > d->lines-1)
     {
-        if(e->total_size - e->viewportOffset.line > d->lines-1)
+        if(e->total_size - d->scrollOffset.lines > d->lines-1)
         {
-            e->viewportOffset.line +=1;
+            d->scrollOffset.lines +=1;
         }
     }
     // scroll up
-    if(e->crsr.line < e->viewportOffset.line)
+    if(e->crsr.line < d->scrollOffset.lines)
     {
-        e->viewportOffset.line =e->crsr.line;
+        d->scrollOffset.lines =e->crsr.line;
     }
 
-    // clear viewport
+    // clear scroll
     memset(d->viewbuffer, BLANK, d->lines*d->cols);
 
-    // render viewport
+    // render scroll
     for(size_t l=0; l<d->lines; l++)
     {
-        size_t dl = e->viewportOffset.line + l;
-        size_t dc = e->viewportOffset.col;
+        size_t dl = d->scrollOffset.lines + l;
+        size_t dc = d->scrollOffset.cols;
         if(dl < e->total_size)
         {
             size_t dlen = MIN(d->cols, e->lines[dl].filled_size <= dc ? 0 : e->lines[dl].filled_size - dc);
@@ -128,7 +129,7 @@ void display_render_editor(Display *d, Editor *e)
         }
     } 
 
-    // set cursor in viewport
-    d->crsr.col  = e->crsr.col - e->viewportOffset.col;
-    d->crsr.line = e->crsr.line - e->viewportOffset.line;
+    // set cursor in scroll
+    d->crsr.col  = e->crsr.col - d->scrollOffset.cols;
+    d->crsr.line = e->crsr.line - d->scrollOffset.lines;
 }
