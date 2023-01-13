@@ -25,34 +25,16 @@
 #include <sys/ioctl.h>
 #include <signal.h>
 #include "maybe.h"
+#include "defs.h"
+#include "cursor.h"
+#include "display.h"
+#include "editor.h"
 
-#define NEW_LINE  '\n'
-#define BLANK     '\x20'
-#define ESCAPE    "\x1b"
-#define BACKSPACE "\x7f"
-#define DELETE    "\x1b\x5b\x33\x7e"
 
 #define MAX_ESC_SEQ_LEN 255
-#define LINE_INITIAL_SIZE 1 // increas for "procductive" usage
-
-#define DO_TRACE true
-#define TRACE_TO stdout
-#define TRACE_DO(do_this) { if(DO_TRACE) do_this; }
-
-#define LEN(a) (sizeof((a))/sizeof((a[0])))
-#define MAX(a,b) ((a)>(b)?(a):(b))
-#define MIN(a,b) ((a)<(b)?(a):(b))
 
 #define INITIAL_STRING_BUFFER_SIZE 1
 #define GOTO_FINISH(_ret_val) { ret_val = (_ret_val); goto finish; }
-
-typedef enum
-{
-    quit,
-    search,
-    browse,
-    insert
-} EMode;
 
 // helper function to get escape sequence by pressing keys
 int printt_escape_seq(void)
@@ -77,147 +59,6 @@ int printt_escape_seq(void)
 MAYBE_TYPE(size_t)
 MAYBE_FAIL(size_t)
 
-typedef struct {
-    size_t line, col;
-} Cursor;
-
-typedef struct {
-    char *viewbuffer;
-    size_t lines;
-    size_t cols;
-    Cursor crsr;
-} Display;
-Display* display_init(const size_t lines, const size_t cols)
-{
-    assert(lines != 0 && cols != 0);
-    size_t buf_size = cols*lines;
-    Display *d = malloc(sizeof(Display));
-    if(d==NULL) return NULL;
-    d->viewbuffer = malloc(sizeof(char)*buf_size);
-    if(d->viewbuffer==NULL)
-    {
-        free(d);
-        return NULL;
-    }
-    d->lines = lines;
-    d->cols = cols;
-    d->crsr = (Cursor){0,0};
-    //fill with blakns
-    memset(d->viewbuffer,BLANK, buf_size);
-    return d;
-}
-
-void display_free(Display *d)
-{
-    if(d)
-    {
-        if(d->viewbuffer) free(d->viewbuffer);
-        d->lines = 0;
-        d->cols  = 0;
-        d->crsr  = (Cursor){0,0};
-    }
-}
-
-
-typedef struct {
-    char* content;
-    size_t total_size;
-    size_t filled_size;
-} Line;
-
-typedef struct {
-    Line* lines;
-    size_t total_size;
-    Cursor crsr;
-    Cursor viewportOffset;
-    EMode mode;
-} Editor;
-
-Editor* editor_init()
-{
-    Editor *e;
-    e = malloc(sizeof(Editor));
-    e->lines = NULL;
-    e->total_size = 0;
-    e->crsr = (Cursor){0,0};
-    e->viewportOffset = (Cursor){0,0};
-    e->mode = browse;
-    return e;
-}
-
-void editor_free(Editor *e)
-{
-    if(e != NULL)
-    {
-        if(e->lines != NULL)
-        {
-            for(int i=0; i<e->total_size; i++)
-            {
-                free(e->lines[i].content);
-                e->lines[i].content = NULL;
-                e->lines[i].filled_size = 0;
-                e->lines[i].total_size = 0;
-            }
-            free(e->lines);
-            e->lines = NULL;
-        }
-        free(e);
-        e = NULL;
-    }
-}
-
-bool editor_append_line(Editor *e, const char *s)
-{
-    assert(e && s);
-
-    if(e->lines == NULL)
-    {
-        e->total_size = 1;
-        e->lines = malloc(sizeof(Line));
-    }
-    else
-    {
-        e->total_size += 1;
-        e->lines = realloc(e->lines, sizeof(Line)*(e->total_size));
-    }
-    if(e->lines == NULL) return false;
-
-    size_t l = e->total_size - 1;
-    size_t slen = strlen(s);
-    if(s[slen-1] == '\n') slen -= 1; // skip new line
-    e->lines[l].total_size = MAX(LINE_INITIAL_SIZE, slen);
-
-    e->lines[l].content = malloc(sizeof(char)*(e->lines[l].total_size));
-    if(!e->lines[l].content) return false;
-
-    memcpy(e->lines[l].content, s, slen);
-    e->lines[l].filled_size = slen;
-
-    return true;
-}
-
-void editor_render_to_display(const Editor *e, Display *d)
-{
-    assert(e!=NULL && d!=NULL);
-    memset(d->viewbuffer, BLANK, d->lines*d->cols);
-    for(size_t l=0; l<d->lines; l++)
-    {
-        size_t dl = e->viewportOffset.line + l;
-        size_t dc = e->viewportOffset.col;
-        if(dl < e->total_size)
-        {
-            size_t dlen = MIN(d->cols, e->lines[dl].filled_size <= dc ? 0 : e->lines[dl].filled_size - dc);
-            if(dlen > 0) memcpy(&(d->viewbuffer[l*d->cols]), &(e->lines[dl].content[dc]), dlen);
-            if(dlen == 0) d->viewbuffer[l*d->cols] = '#';
-        }
-        else
-        {
-            d->viewbuffer[l*d->cols] = '~';
-        }
-    } 
-    d->crsr.col  = e->crsr.col - e->viewportOffset.col;
-    d->crsr.line = e->crsr.line - e->viewportOffset.line;
-}
 
 // File Handling
 bool file_exists(const char *path)
@@ -239,35 +80,6 @@ MAYBE(size_t) file_size(const char *path)
         INIT_NOTHING(size_t, res);
         return res;
     }
-}
-
-bool display_resize(Display *d)
-{
-    struct winsize w;
-    int err = ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    if(err != 0)
-    {
-        fprintf(stderr,"ERROR: Failed to receive signal, ioctl terminated with Error %d (%s).\n", err, strerror(err));
-        return false;
-    }
-    d->lines = w.ws_row;
-    d->cols = w.ws_col;
-    d->viewbuffer = realloc(d->viewbuffer, d->lines*d->cols*sizeof(*d->viewbuffer));
-    if(!d->viewbuffer)
-    {
-        fprintf(stderr,"ERROR: Failed to reallocate viewbuffer %d (%s).\n", errno, strerror(errno));
-        return false;
-    }
-    return true;
-}
-
-
-void display_render_to_terminal(const Display *d)
-{
-    fprintf(stdout, "\033[H");
-    fwrite(d->viewbuffer, sizeof(*d->viewbuffer), d->lines*d->cols, stdout);
-    fprintf(stdout, "\033[%zu;%zuH", d->crsr.line + 1, d->crsr.col + 1);
-    fflush(stdout);
 }
 
 //void handle_resize_signal(int signal)
