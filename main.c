@@ -103,13 +103,7 @@ void handle_quit(Editor *e, Display *d)
 void handle_go_right(Editor *e, Display *d)
 {
     e->crsr.col += 1;
-    if(e->crsr.col - e->viewportOffset.col >= d->cols)
-    {
-        if(e->viewportOffset.col + d->cols < e->lines[e->crsr.line].filled_size)
-        {
-            e->viewportOffset.col += 1;
-        }
-    }
+    // stop at last character
     if(e->crsr.col  >= e->lines[e->crsr.line].filled_size)
     {
         e->crsr.col = e->lines[e->crsr.line].filled_size - 1;
@@ -118,10 +112,6 @@ void handle_go_right(Editor *e, Display *d)
 void handle_go_left(Editor *e, Display *d)
 {
     if(e->crsr.col > 0) e->crsr.col -= 1;
-    if(e->crsr.col < e->viewportOffset.col)
-    {
-        e->viewportOffset.col -= 1;
-    }
 }
 void handle_go_down(Editor *e, Display *d)
 {
@@ -129,25 +119,13 @@ void handle_go_down(Editor *e, Display *d)
     {
         e->crsr.line += 1;
     }
-    if(e->crsr.line > d->lines-1)
-    {
-        if(e->total_size - e->viewportOffset.line > d->lines-1)
-        {
-            e->viewportOffset.line +=1;
-        }
-    }
     e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
-    fprintf(stderr, "e->crsr.col=%zu; line_filledsize=%zu\n", e->crsr.col,e->lines[e->crsr.line].filled_size);
 }
 void handle_go_up(Editor *e, Display *d)
 {
     if(e->crsr.line > 0)
     {
         e->crsr.line -= 1;
-    }
-    if(e->crsr.line < e->viewportOffset.line)
-    {
-        e->viewportOffset.line =e->crsr.line;
     }
     e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
 }

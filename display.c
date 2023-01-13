@@ -75,10 +75,43 @@ void display_render_to_terminal(const Display *d)
 }
 
 
-void display_render_editor(Display *d, const Editor *e)
+void display_render_editor(Display *d, Editor *e)
 {
     assert(e!=NULL && d!=NULL);
+    
+    // prepare cursors
+    // TODO maybe vieportOffset (scolling offset) ist better located in Display instead of Editor
+    //scroll to the right if necessary
+    if(e->crsr.col - e->viewportOffset.col >= d->cols)
+    {
+        if(e->viewportOffset.col + d->cols < e->lines[e->crsr.line].filled_size)
+        {
+            e->viewportOffset.col += 1;
+        }
+    }
+    //scroll to the left if necessary
+    if(e->crsr.col < e->viewportOffset.col)
+    {
+        e->viewportOffset.col -= 1;
+    }
+    // scroll down
+    if(e->crsr.line > d->lines-1)
+    {
+        if(e->total_size - e->viewportOffset.line > d->lines-1)
+        {
+            e->viewportOffset.line +=1;
+        }
+    }
+    // scroll up
+    if(e->crsr.line < e->viewportOffset.line)
+    {
+        e->viewportOffset.line =e->crsr.line;
+    }
+
+    // clear viewport
     memset(d->viewbuffer, BLANK, d->lines*d->cols);
+
+    // render viewport
     for(size_t l=0; l<d->lines; l++)
     {
         size_t dl = e->viewportOffset.line + l;
@@ -94,6 +127,8 @@ void display_render_editor(Display *d, const Editor *e)
             d->viewbuffer[l*d->cols] = '~';
         }
     } 
+
+    // set cursor in viewport
     d->crsr.col  = e->crsr.col - e->viewportOffset.col;
     d->crsr.line = e->crsr.line - e->viewportOffset.line;
 }

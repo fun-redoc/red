@@ -16,6 +16,6 @@ Display* display_init(const size_t lines, const size_t cols);
 void display_free(Display *d);
 bool display_resize(Display *d);
 void display_render_to_terminal(const Display *d);
-void display_render_editor(Display *d, const Editor *e);
+void display_render_editor(Display *d, Editor *e);
 
 #endif
