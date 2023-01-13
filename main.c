@@ -93,14 +93,14 @@ typedef struct
 {
     EMode mode;
     char* seq;
-    void (*handler)(Editor*, Display*);
+    void (*handler)(Editor*);
 } KeyHandler;
 
-void handle_quit(Editor *e, Display *d)
+void handle_quit(Editor *e)
 {
     e->mode = quit;
 }
-void handle_go_right(Editor *e, Display *d)
+void handle_go_right(Editor *e)
 {
     e->crsr.col += 1;
     // stop at last character
@@ -109,11 +109,11 @@ void handle_go_right(Editor *e, Display *d)
         e->crsr.col = e->lines[e->crsr.line].filled_size - 1;
     }
 }
-void handle_go_left(Editor *e, Display *d)
+void handle_go_left(Editor *e)
 {
     if(e->crsr.col > 0) e->crsr.col -= 1;
 }
-void handle_go_down(Editor *e, Display *d)
+void handle_go_down(Editor *e)
 {
     if(e->crsr.line < e->total_size-1)
     {
@@ -121,7 +121,7 @@ void handle_go_down(Editor *e, Display *d)
     }
     e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
 }
-void handle_go_up(Editor *e, Display *d)
+void handle_go_up(Editor *e)
 {
     if(e->crsr.line > 0)
     {
@@ -129,7 +129,7 @@ void handle_go_up(Editor *e, Display *d)
     }
     e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
 }
-void handle_start_search_mode(Editor *e, Display *d)
+void handle_start_search_mode(Editor *e)
 {
     e->mode = search;
 }
@@ -259,7 +259,7 @@ int main(int argc, char* argv[])
 
         assert((size_t) seq_len < sizeof(seq));
 
-        void (*key_handler)(Editor*, Display*) = NULL;
+        void (*key_handler)(Editor*) = NULL;
         for(size_t i=0; i < LEN(handler_map); i++)
         {
             if(   handler_map[i].mode == e->mode
@@ -268,7 +268,7 @@ int main(int argc, char* argv[])
                 key_handler = handler_map[i].handler;
             }
         }
-        if(key_handler) key_handler(e,d);
+        if(key_handler) key_handler(e);
     }
 
 finish:
