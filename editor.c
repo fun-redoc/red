@@ -81,26 +81,4 @@ bool editor_append_line(Editor *e, const char *s)
     return true;
 }
 
-void editor_render_to_display(const Editor *e, Display *d)
-{
-    assert(e!=NULL && d!=NULL);
-    memset(d->viewbuffer, BLANK, d->lines*d->cols);
-    for(size_t l=0; l<d->lines; l++)
-    {
-        size_t dl = e->viewportOffset.line + l;
-        size_t dc = e->viewportOffset.col;
-        if(dl < e->total_size)
-        {
-            size_t dlen = MIN(d->cols, e->lines[dl].filled_size <= dc ? 0 : e->lines[dl].filled_size - dc);
-            if(dlen > 0) memcpy(&(d->viewbuffer[l*d->cols]), &(e->lines[dl].content[dc]), dlen);
-            if(dlen == 0) d->viewbuffer[l*d->cols] = '#';
-        }
-        else
-        {
-            d->viewbuffer[l*d->cols] = '~';
-        }
-    } 
-    d->crsr.col  = e->crsr.col - e->viewportOffset.col;
-    d->crsr.line = e->crsr.line - e->viewportOffset.line;
-}
 #endif

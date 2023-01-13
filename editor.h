@@ -1,4 +1,5 @@
 #ifndef __EDITOR_H__
+#define __EDITOR_H__
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,7 +14,6 @@
 #include "maybe.h"
 #include "defs.h"
 #include "cursor.h"
-#include "display.h"
 
 typedef enum
 {
@@ -39,5 +39,4 @@ typedef struct {
 Editor* editor_init();
 void editor_free(Editor *e);
 bool editor_append_line(Editor *e, const char *s);
-void editor_render_to_display(const Editor *e, Display *d);;
 #endif

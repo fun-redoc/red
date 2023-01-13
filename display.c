@@ -73,3 +73,27 @@ void display_render_to_terminal(const Display *d)
     fprintf(stdout, "\033[%zu;%zuH", d->crsr.line + 1, d->crsr.col + 1);
     fflush(stdout);
 }
+
+
+void display_render_editor(Display *d, const Editor *e)
+{
+    assert(e!=NULL && d!=NULL);
+    memset(d->viewbuffer, BLANK, d->lines*d->cols);
+    for(size_t l=0; l<d->lines; l++)
+    {
+        size_t dl = e->viewportOffset.line + l;
+        size_t dc = e->viewportOffset.col;
+        if(dl < e->total_size)
+        {
+            size_t dlen = MIN(d->cols, e->lines[dl].filled_size <= dc ? 0 : e->lines[dl].filled_size - dc);
+            if(dlen > 0) memcpy(&(d->viewbuffer[l*d->cols]), &(e->lines[dl].content[dc]), dlen);
+            if(dlen == 0) d->viewbuffer[l*d->cols] = '#';
+        }
+        else
+        {
+            d->viewbuffer[l*d->cols] = '~';
+        }
+    } 
+    d->crsr.col  = e->crsr.col - e->viewportOffset.col;
+    d->crsr.line = e->crsr.line - e->viewportOffset.line;
+}

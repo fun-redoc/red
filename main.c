@@ -262,7 +262,7 @@ int main(int argc, char* argv[])
     while (e->mode != quit) 
     {
 //        if((ret_val=printt_escape_seq()) != 0) GOTO_FINISH(ret_val)
-        editor_render_to_display(e, d);
+        display_render_editor(d, e);
         display_render_to_terminal(d);
 
         char seq[MAX_ESC_SEQ_LEN] = {0};
