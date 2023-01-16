@@ -1,18 +1,19 @@
 // WORKING ON:
-// TODO search and jump to next search position
+// insert mode
+// search and jump to next search position
 
 // READY
 
 // BACKLOG:
-// TODO maybe Bug when row is empty (shows only #, which is but the sign for overscrolling a line aut of visible area)
-// TODO : jump to the end or the beginning of line
-// TODO move cursor by word
-// TODO move cursor by paragraph
-// TODO insert mode
-// TODO insert at position
-// TODO append to Line
-// TODO append new line
-// TODO move cursor in insert mode (emacs commands, arrow keys)
+// goto line number
+// maybe Bug when row is empty (shows only #, which is but the sign for overscrolling a line aut of visible area)
+// : jump to the end or the beginning of line
+// move cursor by word
+// move cursor by paragraph
+// insert at position
+// append to Line
+// append new line
+// move cursor in insert mode (emacs commands, arrow keys)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,9 +25,10 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <signal.h>
+#include <ctype.h>
+#include <stdbool.h>
 #include "maybe.h"
 #include "defs.h"
-#include "cursor.h"
 #include "display.h"
 #include "editor.h"
 
@@ -35,6 +37,7 @@
 
 #define INITIAL_STRING_BUFFER_SIZE 1
 #define GOTO_FINISH(_ret_val) { ret_val = (_ret_val); goto finish; }
+
 
 // helper function to get escape sequence by pressing keys
 int printt_escape_seq(void)
@@ -93,14 +96,14 @@ typedef struct
 {
     EMode mode;
     char* seq;
-    void (*handler)(Editor*);
+    void (*handler)(Editor*, const char* s);
 } KeyHandler;
 
-void handle_quit(Editor *e)
+void handle_quit(Editor *e, const char* s)
 {
     e->mode = quit;
 }
-void handle_go_right(Editor *e)
+void handle_go_right(Editor *e, const char* s)
 {
     e->crsr.col += 1;
     // stop at last character
@@ -109,11 +112,11 @@ void handle_go_right(Editor *e)
         e->crsr.col = e->lines[e->crsr.line].filled_size - 1;
     }
 }
-void handle_go_left(Editor *e)
+void handle_go_left(Editor *e, const char* s)
 {
     if(e->crsr.col > 0) e->crsr.col -= 1;
 }
-void handle_go_down(Editor *e)
+void handle_go_down(Editor *e, const char* s)
 {
     if(e->crsr.line < e->total_size-1)
     {
@@ -121,7 +124,7 @@ void handle_go_down(Editor *e)
     }
     e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
 }
-void handle_go_up(Editor *e)
+void handle_go_up(Editor *e, const char* s)
 {
     if(e->crsr.line > 0)
     {
@@ -129,26 +132,93 @@ void handle_go_up(Editor *e)
     }
     e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
 }
-void handle_start_search_mode(Editor *e)
+void handle_enter_search_mode(Editor *e, const char*s)
 {
+    assert(e);
+    if(!e->search_field)
+    {
+        e->search_field = searchfield_init();
+    }
     e->mode = search;
 }
+void handle_leave_search_mode(Editor *e, const char*s)
+{
+    e->mode = browse;
+}
 
+void handle_generic_searchmode(Editor *e, const char*s)
+{
+    searchfield_edit(e->search_field, s);
+}
+void handle_delete_search_mode(Editor *e, const char*s)
+{
+    searchfield_delete(e->search_field);
+}
+void handle_left_search_mode(Editor *e, const char*s)
+{
+    searchfield_move_left(e->search_field);
+}
+void handle_right_search_mode(Editor *e, const char*s)
+{
+    searchfield_move_right(e->search_field);
+}
 
-KeyHandler handler_map[] = {
-    {browse, "q", handle_quit},
-    {browse, "l", handle_go_right},
-    {browse, "h", handle_go_left},
-    {browse, "j", handle_go_down},
-    {browse, "k", handle_go_up},
-    {browse, "s", handle_start_search_mode},
-//    {search, ENTER, handle_tart_search_mode},
-};
+void handle_generic_insertmode(Editor *e, const char*s)
+{
+    editor_insert(e, s);
+}
+void handle_enter_insert_mode(Editor *e, const char *s)
+{                                    
+    e->mode = insert;                                    
+    editor_set_message(e, MESSAGE_INSERT_MODE);
+}                                    
+void handle_left_insert_mode (Editor *e, const char *s)
+{                                    
+    assert(0 && "unimplemented");
+}                                    
+void handle_right_insert_mode(Editor *e, const char *s)
+{                                    
+    assert(0 && "unimplemented");
+}
+void handle_delete_insert_mode(Editor *e, const char *s)
+{
+    assert(0 && "unimplemented");
+}
+void handle_leave_insert_mode(Editor *e, const char *s)
+{                                    
+    e->mode = browse;                                    
+    editor_set_message(e, NULL); // means delete message
+}                                    
 
 int main(int argc, char* argv[])
 {
     int ret_val = 0;
     char *line = NULL;
+    KeyHandler handler_map[] = {
+        {browse, "q", handle_quit},
+        {browse, "l", handle_go_right},
+        {browse, "h", handle_go_left},
+        {browse, "j", handle_go_down},
+        {browse, "k", handle_go_up},
+        {browse, "\x1b\x5b\x44", handle_go_left},
+        {browse, "\x1b\x5b\x43", handle_go_right},
+        {browse, "\x1b\x5b\x41", handle_go_up},
+        {browse, "\x1b\x5b\x42", handle_go_down},
+        {browse, "s", handle_enter_search_mode},
+        {browse, "i", handle_enter_insert_mode},
+        {insert, "\x1b\x5b\x44", handle_go_left},
+        {insert, "\x1b\x5b\x43", handle_go_right},
+        {insert, "\x1b\x5b\x41", handle_go_up},
+        {insert, "\x1b\x5b\x42", handle_go_down},
+        {insert, "\x7f", handle_delete_insert_mode},
+        {insert, "\x04", handle_delete_insert_mode},
+        {insert, ESCAPE, handle_leave_insert_mode},
+        {search, ESCAPE, handle_leave_search_mode},
+        {search, "\x7f", handle_delete_search_mode},
+        {search, "\x04", handle_delete_search_mode},
+        {search, "\x1b\x5b\x44", handle_left_search_mode},
+        {search, "\x1b\x5b\x43", handle_right_search_mode},
+    };
 
     assert(argc == 2 && "ERROR: you have to provide a file name");
     if(!file_exists(argv[1])) 
@@ -203,7 +273,6 @@ int main(int argc, char* argv[])
     // TODO get Terminal size to initialise display size
     Display *d = display_init(20,20);
 
-    bool insert = false;
     bool terminal_ready = false;
 
     if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO)) 
@@ -235,12 +304,60 @@ int main(int argc, char* argv[])
         GOTO_FINISH(1);
     }
 
+    Viewport editor_viewport  = {0,0         ,d->lines,d->cols, (Scroll){0,0}};
+    Viewport search_viewport  = {0,d->lines-1,1       ,d->cols, (Scroll){0,0}};
+    Viewport message_viewport = {0,d->lines-1,1       ,d->cols, (Scroll){0,0}};
     bool quit = false;
     if(!display_resize(d)) GOTO_FINISH(1)
     while (e->mode != quit) 
     {
-//        if((ret_val=printt_escape_seq()) != 0) GOTO_FINISH(ret_val)
-        display_render_editor(d, e);
+        //uncomment to see ascii sequence while typing
+        //if((ret_val=printt_escape_seq()) != 0) GOTO_FINISH(ret_val)
+        //else continue;
+
+        switch(e->mode)
+        {
+            case browse:
+            {
+                fprintf(stderr, "BROWSE MODE\n");
+                // adjust viewport after resize
+                editor_viewport.lines = d->lines;
+                editor_viewport.cols = d->cols;
+                editor_render(e, &editor_viewport, d);
+                break;
+            }
+            case search:
+            {
+                fprintf(stderr, "SEARCH MODE\n");
+                // reserve bottom row for search word edditing
+                // and clearly adjust to resize
+                editor_viewport.lines = d->lines-1;
+                editor_viewport.cols = d->cols;
+                editor_render(e, &editor_viewport, d);
+
+                search_viewport.y0 = d->lines-1;
+                search_viewport.cols = d->cols;
+                searchfield_render(e->search_field, &search_viewport, d);
+                break;
+            }
+            case insert:
+            {
+                fprintf(stderr, "INSERT MODE\n");
+                // reserve bottom row for search word edditing
+                // and clearly adjust to resize
+                editor_viewport.lines = d->lines-1;
+                editor_viewport.cols = d->cols;
+                editor_render(e, &editor_viewport, d);
+
+                message_viewport.y0 = d->lines-1;
+                message_viewport.cols = d->cols;
+                editor_message_render(e, &message_viewport, d);
+                break;
+            }
+            default:
+                fprintf(stderr,"ERROR: unkown editor mode\n");
+                GOTO_FINISH(1);
+        }
         display_render_to_terminal(d);
 
         char seq[MAX_ESC_SEQ_LEN] = {0};
@@ -259,7 +376,7 @@ int main(int argc, char* argv[])
 
         assert((size_t) seq_len < sizeof(seq));
 
-        void (*key_handler)(Editor*) = NULL;
+        void (*key_handler)(Editor*, const char*) = NULL;
         for(size_t i=0; i < LEN(handler_map); i++)
         {
             if(   handler_map[i].mode == e->mode
@@ -268,7 +385,28 @@ int main(int argc, char* argv[])
                 key_handler = handler_map[i].handler;
             }
         }
-        if(key_handler) key_handler(e);
+        if(key_handler) {
+            key_handler(e, seq);
+        }
+        else
+        {
+            // no special handler found try gegenric
+            bool ok = true;
+            switch (e->mode)
+            {
+            case search:
+                for(size_t i=0; i<strlen(seq); i++) ok &= isprint(seq[i]);
+                if(ok) handle_generic_searchmode(e, seq);
+                break;
+            case insert:
+                for(size_t i=0; i<strlen(seq); i++) ok &= isprint(seq[i]);
+                if(ok) handle_generic_insertmode(e, seq);
+                break;
+            default:
+                break;
+            }
+
+        }
     }
 
 finish:

@@ -10,7 +10,6 @@
 #include <sys/ioctl.h>
 #include <signal.h>
 #include "defs.h"
-#include "cursor.h"
 #include "maybe.h"
 #include "display.h"
 
@@ -31,7 +30,7 @@ Display* display_init(const size_t lines, const size_t cols)
     d->crsr = (Cursor){0,0};
     d->scrollOffset = (Scroll){0,0};
     //fill with blakns
-    memset(d->viewbuffer,BLANK, buf_size);
+    memset(d->viewbuffer,'*', buf_size);
     return d;
 }
 
@@ -63,73 +62,16 @@ bool display_resize(Display *d)
         fprintf(stderr,"ERROR: Failed to reallocate viewbuffer %d (%s).\n", errno, strerror(errno));
         return false;
     }
+    memset(d->viewbuffer,'*', d->lines*d->cols);
     return true;
 }
 
 
 void display_render_to_terminal(const Display *d)
 {
-    fprintf(stdout, "\033[H");
+    fprintf(stdout, ANSI_HOME);
     fwrite(d->viewbuffer, sizeof(*d->viewbuffer), d->lines*d->cols, stdout);
-    fprintf(stdout, "\033[%zu;%zuH", d->crsr.line + 1, d->crsr.col + 1);
+    fprintf(stdout, ANSI_CURSOR_XY, d->crsr.line + 1, d->crsr.col + 1);
     fflush(stdout);
 }
 
-
-void display_render_editor(Display *d, Editor *e)
-{
-    assert(e!=NULL && d!=NULL);
-    
-    // prepare cursors
-    // TODO maybe vieportOffset (scolling offset) ist better located in Display instead of Editor
-    //scroll to the right if necessary
-    if(e->crsr.col >= d->scrollOffset.cols + d->cols)
-    {
-        if(d->scrollOffset.cols + d->cols < e->lines[e->crsr.line].filled_size)
-        {
-            d->scrollOffset.cols += 1;
-        }
-    }
-    //scroll to the left if necessary
-    if(e->crsr.col < d->scrollOffset.cols)
-    {
-        d->scrollOffset.cols -= 1;
-    }
-    // scroll down
-    if(e->crsr.line > d->lines-1)
-    {
-        if(e->total_size - d->scrollOffset.lines > d->lines-1)
-        {
-            d->scrollOffset.lines +=1;
-        }
-    }
-    // scroll up
-    if(e->crsr.line < d->scrollOffset.lines)
-    {
-        d->scrollOffset.lines =e->crsr.line;
-    }
-
-    // clear scroll
-    memset(d->viewbuffer, BLANK, d->lines*d->cols);
-
-    // render scroll
-    for(size_t l=0; l<d->lines; l++)
-    {
-        size_t dl = d->scrollOffset.lines + l;
-        size_t dc = d->scrollOffset.cols;
-        if(dl < e->total_size)
-        {
-            size_t dlen = MIN(d->cols, e->lines[dl].filled_size <= dc ? 0 : e->lines[dl].filled_size - dc);
-            if(dlen > 0) memcpy(&(d->viewbuffer[l*d->cols]), &(e->lines[dl].content[dc]), dlen);
-            if(dlen == 0) d->viewbuffer[l*d->cols] = '#';
-        }
-        else
-        {
-            d->viewbuffer[l*d->cols] = '~';
-        }
-    } 
-
-    // set cursor in scroll
-    d->crsr.col  = e->crsr.col - d->scrollOffset.cols;
-    d->crsr.line = e->crsr.line - d->scrollOffset.lines;
-}

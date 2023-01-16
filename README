@@ -20,6 +20,7 @@ I'm getting older now, has to hurry up, writing code editor.
 
 ## Planed Features
 - search and repeat search
+- goto line number
 - search and replace, single and bulk
 - insert, change, replace, append, delete
 - undo
