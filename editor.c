@@ -16,6 +16,7 @@
 #include "editor.h"
 
 #define LINE_INITIAL_SIZE 1 // increas for "procductive" usage
+#define LINE_GROTH_FACTOR 2
 
 Editor* editor_init()
 {
@@ -70,17 +71,19 @@ bool editor_append_line(Editor *e, const char *s)
 {
     assert(e && s);
 
+    size_t new_size;
     if(e->lines == NULL)
     {
-        e->total_size = 1;
+        new_size = 1;
         e->lines = malloc(sizeof(Line));
     }
     else
     {
-        e->total_size += 1;
-        e->lines = realloc(e->lines, sizeof(Line)*(e->total_size));
+        new_size = e->total_size + 1;
+        e->lines = realloc(e->lines, sizeof(Line)*(new_size));
     }
     if(e->lines == NULL) return false;
+    e->total_size = new_size;
 
     size_t l = e->total_size - 1;
     size_t slen = strlen(s);
@@ -234,7 +237,7 @@ void editor_message_render(const Editor *e, const Viewport *v, Display *d)
     {
         //fprintf(stderr, "TRACE: rendering possible\n");
         size_t max_contet_len = MIN(e->message_count, v->cols);
-        memset(&(d->viewbuffer[(v->y0)*d->cols+(v->x0)]), ' ', max_contet_len);
+        memset(&(d->viewbuffer[(v->y0)*d->cols+(v->x0)]), ' ', v->cols);
         memcpy(&(d->viewbuffer[(v->y0)*d->cols+(v->x0)]), e->message, max_contet_len);
     }
 }
@@ -243,26 +246,53 @@ void editor_insert(Editor *e, const char *s)
 {
     assert(e);
     assert(s && strlen(s) > 0);
-    if(e->total_size < e->crsr.line)
+    if(e->total_size > e->crsr.line)
     {
         // edit exising line
-        Line line = e->lines[e->crsr.line];
+        #define line (e->lines[e->crsr.line])
         size_t needed_capcacity = strlen(s) + line.filled_size;
         if(needed_capcacity < line.total_size)
         {
+            fprintf(stderr, "-> no resize needed - line capacity %zu, needed %zu", line.total_size, needed_capcacity);
             // entry fits current allocated line space
-//            memmove(line.content[e->crsr])
+            assert(e->crsr.col+1 < line.total_size);
+            size_t n = line.filled_size - e->crsr.col;
+            memcpy(&(line.content[e->crsr.col+strlen(s)]), &(line.content[e->crsr.col]),n);
+            memcpy(&(line.content[e->crsr.col]), s, strlen(s));
+            e->crsr.col += strlen(s);
+            line.filled_size += strlen(s);
         }
         else
         {
-            // TODO rsize line
+            fprintf(stderr, "-> cur line |%s|\n", line.content);
+            fprintf(stderr, "-> line capacity %zu, count %zu\n", line.total_size, line.filled_size);
+            fprintf(stderr, "-> resize needed - line capacity %zu, needed %zu\n", line.total_size, needed_capcacity);
+            size_t new_total_size = line.total_size * LINE_GROTH_FACTOR;
+            while(new_total_size < needed_capcacity) new_total_size *= LINE_GROTH_FACTOR; 
+            fprintf(stderr, "-> new capcacity %zu\n", new_total_size);
+            line.content = realloc(line.content, sizeof(char)*new_total_size);
+            if(!line.content)
+            {
+                fprintf(stderr, "ERROR: failed to alloc memory, cannot insert (%d) %s\n", errno, strerror(errno));
+                return;
+            }
+            line.total_size = new_total_size;
+            fprintf(stderr, "-> cur line extended |%s|\n", line.content);
+            fprintf(stderr, "-> line capacity %zu, count %zu\n", line.total_size, line.filled_size);
+            size_t n = line.filled_size - e->crsr.col;
+            fprintf(stderr, "-> bytes to shift %zu\n", n);
+            fprintf(stderr, "-> crsr at %zu, to insert %zu\n", e->crsr.col, strlen(s));
+            memcpy(&(line.content[e->crsr.col+strlen(s)]), &(line.content[e->crsr.col]),n);
+            memcpy(&(line.content[e->crsr.col]), s, strlen(s));
+            e->crsr.col += strlen(s);
+            line.filled_size += strlen(s);
         }
     }
     else
     {
         // TODO append line
+        assert(0 && "not yetz implemented");
     }
-    assert(0 && "not yet implemented");
 }
 
 #endif

@@ -1,5 +1,6 @@
 // WORKING ON:
-// insert mode
+// insert mode: fix move corsor behind the last char and insert at the end
+// fix resize in (tmux?)
 // search and jump to next search position
 
 // READY
