@@ -18,10 +18,8 @@
 #define LINE_INITIAL_SIZE 1 // increas for "procductive" usage
 #define LINE_GROTH_FACTOR 2
 
-Editor* editor_init()
+int editor_init(Editor* e)
 {
-    Editor *e;
-    e = malloc(sizeof(Editor));
     e->lines = NULL;
     e->total_size = 0;
     e->crsr = (Cursor){0,0};
@@ -31,7 +29,7 @@ Editor* editor_init()
     e->message = NULL;
     e->message_capacity = 0;
     e->message_count = 0;
-    return e;
+    return EXIT_SUCCESS;
 }
 
 void editor_free(Editor *e)
@@ -62,8 +60,6 @@ void editor_free(Editor *e)
             free(e->lines);
             e->lines = NULL;
         }
-        free(e);
-        e = NULL;
     }
 }
 
@@ -101,10 +97,14 @@ bool editor_append_line(Editor *e, const char *s)
 
 void editor_render(const Editor *e, Viewport *v, Display *disp)
 {
+    fprintf(stderr, "TRACE: enter editor_render  !(%zu + %zu <= %zu)\n",v->x0,v->cols, disp->cols);
+    fprintf(stderr, "TRACE:                      !(%zu + %zu <= %zu)\n",v->y0,v->lines, disp->lines);
     assert(e!=NULL && disp!=NULL && v!=NULL);
     // viewport has to fit into Display
-    assert(v->cols <= disp->cols);
-    assert(v->lines <= disp->lines);
+    if(!(v->x0 + v->cols <= disp->cols)) return;
+    if(!(v->y0 + v->lines <= disp->lines)) return;
+
+    fprintf(stderr, "TRACE: in editor_render after checks \n");
 
 //    size_t cols_available  = viewport->cols  - viewport->x0;
 //    size_t lines_available = viewport->lines - viewport->y0;
@@ -114,15 +114,20 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     //scroll to the right if necessary
     if(e->crsr.col >= v->scrollOffset.cols + v->cols)
     {
-        if(v->scrollOffset.cols + v->cols < e->lines[e->crsr.line].filled_size)
+        if(v->scrollOffset.cols + v->cols <= e->lines[e->crsr.line].filled_size)
         {
             v->scrollOffset.cols += 1;
+            fprintf(stderr, "TRACE: editor_render 1 -- scrl.col=%zu\n", v->scrollOffset.cols);
         }
     }
     //scroll to the left if necessary
     if(e->crsr.col < v->scrollOffset.cols)
     {
-        v->scrollOffset.cols -= 1;
+        if(e->crsr.col < v->cols)
+        {
+            v->scrollOffset.cols -= 1;
+        }
+        fprintf(stderr, "TRACE: editor_render 2 -- scrl.col=%zu\n", v->scrollOffset.cols);
     }
     // scroll down
     if(e->crsr.line > v->lines-1)
@@ -138,6 +143,7 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         v->scrollOffset.lines =e->crsr.line;
     }
 
+    fprintf(stderr, "d->lines=%zu, v-lines=%zu\n", disp->lines, v->lines);
     // render scroll
     for(size_t l=0; l<v->lines; l++)
     {
@@ -151,19 +157,30 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         if(el < e->total_size)
         {
             size_t dlen = MIN(v->cols, e->lines[el].filled_size <= ec ? 0 : e->lines[el].filled_size - ec);
-            if(dlen > 0) memcpy(&(disp->viewbuffer[(v->y0 + l)*disp->cols+ (v->x0)]), &(e->lines[el].content[ec]), dlen);
-            if(dlen == 0) disp->viewbuffer[(v->y0 + l)*disp->cols + (v->x0)] = SCROLLED_OUT_OF_SIGHT;
+            //size_t dlen = MIN(v->cols, MAX(0, e->lines[el].filled_size - ec));
+            fprintf(stderr, "TRACE: editor_render 3 -- scrl.col=%zu dlen=%zu\n", ec, dlen);
+            if(dlen > 0) 
+                memcpy(&(disp->viewbuffer[(v->y0 + l)*disp->cols+ (v->x0)]), &(e->lines[el].content[ec]), dlen);
+            if(dlen == 0) 
+                disp->viewbuffer[(v->y0 + l)*disp->cols + (v->x0)] = SCROLLED_OUT_OF_SIGHT;
 
         }
         else
         {
+            fprintf(stderr, "TRACE: editor_render 4\n");
             disp->viewbuffer[(v->y0 + l)*disp->cols + (v->x0)] = EPMTY_LINE;
         }
+
+        // for debugging purpose uncomment
+        //memset(&(disp->viewbuffer[(v->y0 + l)*disp->cols+(v->x0)]), '#', v->cols);
     } 
 
     // set cursor in scroll
-    disp->crsr.col  = e->crsr.col  - v->scrollOffset.cols + v->x0;
+    int crsr_col = e->crsr.col - v->scrollOffset.cols; // can get negative?
+    fprintf(stderr, "TRACE crsr_col=%d\n", crsr_col);
+    disp->crsr.col  = v->x0 + MAX(0,crsr_col);
     disp->crsr.line = e->crsr.line - v->scrollOffset.lines +v->y0;
+    fprintf(stderr, "TRACE: leaving editor_render\n");
 }
 
 void editor_set_message(Editor *e, const char *s)

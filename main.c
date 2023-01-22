@@ -1,9 +1,11 @@
 // WORKING ON:
-// insert mode: fix move corsor behind the last char and insert at the end
-// fix resize in (tmux?)
+// fix abort in finish
+// fix scroll and movement
 // search and jump to next search position
 
 // READY
+// fix resize in (tmux?)
+// insert mode: fix move corsor behind the last char and insert at the end
 
 // BACKLOG:
 // goto line number
@@ -28,6 +30,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <setjmp.h>
 #include "maybe.h"
 #include "defs.h"
 #include "display.h"
@@ -39,6 +42,63 @@
 #define INITIAL_STRING_BUFFER_SIZE 1
 #define GOTO_FINISH(_ret_val) { ret_val = (_ret_val); goto finish; }
 
+jmp_buf try;
+
+Display d;
+Editor e;
+Viewport editor_viewport;  //= {2,2         ,d->lines-2,d->cols-2, (Scroll){0,0}};
+Viewport search_viewport;  //= {0,d->lines-1,1       ,d->cols, (Scroll){0,0}};
+Viewport message_viewport; //= {0,d->lines-1,1       ,d->cols, (Scroll){0,0}};
+
+void rerender_all()
+{
+    display_resize(&d);
+
+    switch(e.mode)
+    {
+        case browse:
+        {
+            fprintf(stderr, "BROWSE MODE\n");
+            // adjust viewport after resize
+            editor_viewport.lines = d.lines-2;
+            editor_viewport.cols = d.cols-2;
+            editor_render(&e, &editor_viewport, &d);
+            break;
+        }
+        case search:
+        {
+            fprintf(stderr, "SEARCH MODE\n");
+            // reserve bottom row for search word edditing
+            // and clearly adjust to resize
+            editor_viewport.lines = d.lines-2-1;
+            editor_viewport.cols = d.cols-2;
+            editor_render(&e, &editor_viewport, &d);
+
+            search_viewport.y0 = d.lines-1;
+            search_viewport.cols = d.cols;
+            searchfield_render(e.search_field, &search_viewport, &d);
+            break;
+        }
+        case insert:
+        {
+            fprintf(stderr, "INSERT MODE\n");
+            // reserve bottom row for search word edditing
+            // and clearly adjust to resize
+            editor_viewport.lines = d.lines-2-1;
+            editor_viewport.cols = d.cols-2;
+            editor_render(&e, &editor_viewport, &d);
+
+            message_viewport.y0 = d.lines-1;
+            message_viewport.cols = d.cols;
+            editor_message_render(&e, &message_viewport, &d);
+            break;
+        }
+        default:
+            fprintf(stderr,"ERROR: unknown editor mode\n");
+            longjmp(try,EXIT_FAILURE);
+    }
+    display_render_to_terminal(&d);
+}
 
 // helper function to get escape sequence by pressing keys
 int printt_escape_seq(void)
@@ -91,6 +151,8 @@ void handle_resize_signal()
 {
     // TODO 
     // maybe better handle resizing here instead of in the game loop?
+    fprintf(stderr, "handling resize\n");
+    rerender_all();
 }
 
 typedef struct 
@@ -106,12 +168,26 @@ void handle_quit(Editor *e, const char* s)
 }
 void handle_go_right(Editor *e, const char* s)
 {
-    e->crsr.col += 1;
-    // stop at last character
-    if(e->crsr.col  >= e->lines[e->crsr.line].filled_size)
+    if(e->mode==browse)
     {
-        e->crsr.col = e->lines[e->crsr.line].filled_size - 1;
+        if(!(e->crsr.col >= e->lines[e->crsr.line].filled_size))
+        {
+            e->crsr.col += 1;
+        }
+        else
+        {
+            e->crsr.col = e->lines[e->crsr.line].filled_size;
+        }
     }
+    if(e->mode==insert)
+    {
+
+        if(!(e->crsr.col >= e->lines[e->crsr.line].filled_size))
+        {
+            e->crsr.col += 1;
+        }   
+    }
+
 }
 void handle_go_left(Editor *e, const char* s)
 {
@@ -123,7 +199,7 @@ void handle_go_down(Editor *e, const char* s)
     {
         e->crsr.line += 1;
     }
-    e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
+    //e->crsr.col = MIN(e->crsr.col, MAX(0,e->lines[e->crsr.line].filled_size));
 }
 void handle_go_up(Editor *e, const char* s)
 {
@@ -131,7 +207,7 @@ void handle_go_up(Editor *e, const char* s)
     {
         e->crsr.line -= 1;
     }
-    e->crsr.col = MIN(e->crsr.col, MAX(1,e->lines[e->crsr.line].filled_size)-1);
+    //e->crsr.col = MIN(e->crsr.col, MAX(0,e->lines[e->crsr.line].filled_size));
 }
 void handle_enter_search_mode(Editor *e, const char*s)
 {
@@ -240,8 +316,7 @@ int main(int argc, char* argv[])
         GOTO_FINISH(1);
     }
 
-    Editor* e = editor_init();
-    if(!e)
+    if(EXIT_FAILURE == editor_init(&e)) 
     {
         fprintf(stderr, "ERROR: failed to allocate editor.\n");
         GOTO_FINISH(1);     
@@ -264,7 +339,7 @@ int main(int argc, char* argv[])
             fprintf(stderr, "ERROR: failed to read file: %s.\n", strerror(errno));
             GOTO_FINISH(1);
         }
-        if(!editor_append_line(e, line))
+        if(!editor_append_line(&e, line))
         {
             fprintf(stderr, "ERROR: failed to load file.\n");
             GOTO_FINISH(1);
@@ -272,7 +347,11 @@ int main(int argc, char* argv[])
     }
 
     // TODO get Terminal size to initialise display size
-    Display *d = display_init(20,20);
+    if(EXIT_FAILURE == display_init(&d, 20,20))
+    {
+        fprintf(stderr, "ERROR: failed to allocate display.\n");
+        GOTO_FINISH(1);     
+    } 
 
     bool terminal_ready = false;
 
@@ -305,68 +384,88 @@ int main(int argc, char* argv[])
         GOTO_FINISH(1);
     }
 
-    Viewport editor_viewport  = {0,0         ,d->lines,d->cols, (Scroll){0,0}};
-    Viewport search_viewport  = {0,d->lines-1,1       ,d->cols, (Scroll){0,0}};
-    Viewport message_viewport = {0,d->lines-1,1       ,d->cols, (Scroll){0,0}};
-    bool quit = false;
-    if(!display_resize(d)) GOTO_FINISH(1)
-    while (e->mode != quit) 
+    //bool quit = false;
+    //rerender_all();
+    //if(!display_resize(&d)) GOTO_FINISH(1)
+
+    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
+    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+
+    // using lonjump to be able to handle exceptions from resize handler appropriatelly
+    // kind of try-catch with no syntactic sugar
+    int catch_exception = setjmp(try);
+    if(catch_exception==EXIT_FAILURE)
+    {
+        fprintf(stderr, "ERROR: caught an error\n");
+        GOTO_FINISH(1);
+    }
+    while (e.mode != quit) 
     {
         //uncomment to see ascii sequence while typing
         //if((ret_val=printt_escape_seq()) != 0) GOTO_FINISH(ret_val)
         //else continue;
 
-        switch(e->mode)
-        {
-            case browse:
-            {
-                fprintf(stderr, "BROWSE MODE\n");
-                // adjust viewport after resize
-                editor_viewport.lines = d->lines;
-                editor_viewport.cols = d->cols;
-                editor_render(e, &editor_viewport, d);
-                break;
-            }
-            case search:
-            {
-                fprintf(stderr, "SEARCH MODE\n");
-                // reserve bottom row for search word edditing
-                // and clearly adjust to resize
-                editor_viewport.lines = d->lines-1;
-                editor_viewport.cols = d->cols;
-                editor_render(e, &editor_viewport, d);
+        fprintf(stderr, "TRACE: begin of game loop\n");
 
-                search_viewport.y0 = d->lines-1;
-                search_viewport.cols = d->cols;
-                searchfield_render(e->search_field, &search_viewport, d);
-                break;
-            }
-            case insert:
-            {
-                fprintf(stderr, "INSERT MODE\n");
-                // reserve bottom row for search word edditing
-                // and clearly adjust to resize
-                editor_viewport.lines = d->lines-1;
-                editor_viewport.cols = d->cols;
-                editor_render(e, &editor_viewport, d);
+        rerender_all();
+        //switch(e->mode)
+        //{
+        //    case browse:
+        //    {
+        //        fprintf(stderr, "BROWSE MODE\n");
+        //        // adjust viewport after resize
+        //        editor_viewport.lines = d->lines-2;
+        //        editor_viewport.cols = d->cols-2;
+        //        editor_render(e, &editor_viewport, d);
+        //        break;
+        //    }
+        //    case search:
+        //    {
+        //        fprintf(stderr, "SEARCH MODE\n");
+        //        // reserve bottom row for search word edditing
+        //        // and clearly adjust to resize
+        //        editor_viewport.lines = d->lines-1;
+        //        editor_viewport.cols = d->cols;
+        //        editor_render(e, &editor_viewport, d);
 
-                message_viewport.y0 = d->lines-1;
-                message_viewport.cols = d->cols;
-                editor_message_render(e, &message_viewport, d);
-                break;
-            }
-            default:
-                fprintf(stderr,"ERROR: unkown editor mode\n");
-                GOTO_FINISH(1);
-        }
-        display_render_to_terminal(d);
+        //        search_viewport.y0 = d->lines-1;
+        //        search_viewport.cols = d->cols;
+        //        searchfield_render(e->search_field, &search_viewport, d);
+        //        break;
+        //    }
+        //    case insert:
+        //    {
+        //        fprintf(stderr, "INSERT MODE\n");
+        //        // reserve bottom row for search word edditing
+        //        // and clearly adjust to resize
+        //        editor_viewport.lines = d->lines-1;
+        //        editor_viewport.cols = d->cols;
+        //        editor_render(e, &editor_viewport, d);
+
+        //        message_viewport.y0 = d->lines-1;
+        //        message_viewport.cols = d->cols;
+        //        editor_message_render(e, &message_viewport, d);
+        //        break;
+        //    }
+        //    default:
+        //        fprintf(stderr,"ERROR: unkown editor mode\n");
+        //        GOTO_FINISH(1);
+        //}
+        //display_render_to_terminal(d);
 
         char seq[MAX_ESC_SEQ_LEN] = {0};
         errno = 0;
         int seq_len = read(STDIN_FILENO, seq, sizeof(seq));
         if (errno == EINTR) 
         {
-            if(!display_resize(d)) GOTO_FINISH(1);
+            // there was a signal from resize not an entry
+            // resize is handled in the resize handler completly
+            // so ignore this here and loop
+            //if(EXIT_FAILURE == display_resize(&d)){
+            //    fprintf(stderr, "ERROR: failed to resize\n");
+            //    GOTO_FINISH(1);
+            //} 
             continue;
         }
         if (errno > 0) 
@@ -380,37 +479,40 @@ int main(int argc, char* argv[])
         void (*key_handler)(Editor*, const char*) = NULL;
         for(size_t i=0; i < LEN(handler_map); i++)
         {
-            if(   handler_map[i].mode == e->mode
+            if(   handler_map[i].mode == e.mode
                && strcmp(seq, handler_map[i].seq) == 0)
             {
                 key_handler = handler_map[i].handler;
             }
         }
         if(key_handler) {
-            key_handler(e, seq);
+            key_handler(&e, seq);
         }
         else
         {
             // no special handler found try gegenric
             bool ok = true;
-            switch (e->mode)
+            switch (e.mode)
             {
             case search:
                 for(size_t i=0; i<strlen(seq); i++) ok &= isprint(seq[i]);
-                if(ok) handle_generic_searchmode(e, seq);
+                if(ok) handle_generic_searchmode(&e, seq);
                 break;
             case insert:
                 for(size_t i=0; i<strlen(seq); i++) ok &= isprint(seq[i]);
-                if(ok) handle_generic_insertmode(e, seq);
+                if(ok) handle_generic_insertmode(&e, seq);
                 break;
             default:
                 break;
             }
 
         }
+        fprintf(stderr, "TRACE: end of game loop\n");
     }
-
 finish:
+    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
+    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     if (terminal_ready) 
     {
         // reset treminal 
@@ -420,8 +522,8 @@ finish:
         tcsetattr(STDIN_FILENO, 0, &term);
     }
     if(line) free(line);
-    editor_free(e);
-    display_free(d);
+    editor_free(&e);
+    display_free(&d);
     if(f) fclose(f);
     return ret_val;
 }

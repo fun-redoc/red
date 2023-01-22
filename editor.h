@@ -41,7 +41,14 @@ typedef struct {
     size_t message_count;
 } Editor;
 
-Editor* editor_init();
+/**
+ * @brief 
+ * 
+ * @param e 
+ * @return EXIT_FAILURE or EXIT_SUCCESS
+ */
+int editor_init(Editor* e);
+
 void editor_free(Editor *e);
 bool editor_append_line(Editor *e, const char *s);
 void editor_render(const Editor *e, Viewport *viewport, Display *d);

@@ -5,7 +5,6 @@
 #include "defs.h"
 #include "maybe.h"
 
-
 typedef struct {
     char *viewbuffer;
     size_t lines;
@@ -14,9 +13,36 @@ typedef struct {
     Scroll scrollOffset;
 } Display;
 
-Display* display_init(const size_t lines, const size_t cols);
+/**
+ * @brief initializes display structure, allocates display buffer
+ * 
+ * @param d 
+ * @param lines 
+ * @param cols 
+ * @return EXIT_FAILURE or EXIT_SUCCESS
+ */
+int display_init(Display *d, const size_t lines, const size_t cols);
+
+/**
+ * @brief cleans up and frees display buffer
+ * 
+ * @param d 
+ */
 void display_free(Display *d);
-bool display_resize(Display *d);
+
+/**
+ * @brief risizes (reallocates) display buffer and adjust internal state
+ *        handles terminal signals
+ * @param d 
+ * @return EXIT_FAILURE or EXIT_SUCCESS
+ */
+int display_resize(Display *d);
+
+/**
+ * @brief renders buffer to terminal
+ * 
+ * @param d 
+ */
 void display_render_to_terminal(const Display *d);
 
 #endif

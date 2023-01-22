@@ -13,17 +13,15 @@
 #include "maybe.h"
 #include "display.h"
 
-Display* display_init(const size_t lines, const size_t cols)
+int display_init(Display *d, const size_t lines, const size_t cols)
 {
-    assert(lines != 0 && cols != 0);
+    assert(d &&lines != 0 && cols != 0);
     size_t buf_size = cols*lines;
-    Display *d = malloc(sizeof(Display));
-    if(d==NULL) return NULL;
     d->viewbuffer = malloc(sizeof(char)*buf_size);
     if(d->viewbuffer==NULL)
     {
         free(d);
-        return NULL;
+        return EXIT_FAILURE;
     }
     d->lines = lines;
     d->cols = cols;
@@ -31,7 +29,7 @@ Display* display_init(const size_t lines, const size_t cols)
     d->scrollOffset = (Scroll){0,0};
     //fill with blakns
     memset(d->viewbuffer,'*', buf_size);
-    return d;
+    return EXIT_SUCCESS;
 }
 
 void display_free(Display *d)
@@ -45,14 +43,14 @@ void display_free(Display *d)
     }
 }
 
-bool display_resize(Display *d)
+int display_resize(Display *d)
 {
     struct winsize w;
     int err = ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     if(err != 0)
     {
         fprintf(stderr,"ERROR: Failed to receive signal, ioctl terminated with Error %d (%s).\n", err, strerror(err));
-        return false;
+        return EXIT_FAILURE;
     }
     d->lines = w.ws_row;
     d->cols = w.ws_col;
@@ -60,18 +58,20 @@ bool display_resize(Display *d)
     if(!d->viewbuffer)
     {
         fprintf(stderr,"ERROR: Failed to reallocate viewbuffer %d (%s).\n", errno, strerror(errno));
-        return false;
+        return EXIT_FAILURE;
     }
     memset(d->viewbuffer,'*', d->lines*d->cols);
-    return true;
+    return EXIT_SUCCESS;
 }
 
 
 void display_render_to_terminal(const Display *d)
 {
+    fprintf(stderr, "TRACE: entering display_render_to_terminal\n");
     fprintf(stdout, ANSI_HOME);
     fwrite(d->viewbuffer, sizeof(*d->viewbuffer), d->lines*d->cols, stdout);
     fprintf(stdout, ANSI_CURSOR_XY, d->crsr.line + 1, d->crsr.col + 1);
     fflush(stdout);
+    fprintf(stderr, "TRACE: leaving display_render_to_terminal\n");
 }
 
