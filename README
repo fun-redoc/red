@@ -1,5 +1,7 @@
 # RED my own editor
 
+__work is in progress, not yet ready, maybe never near to getting usful__
+
 once in his or her life every programer has to (my subjective pick):
 + code (imperfect) clones of all the heritage gameslike pong, moonlander, space invaders, tetris, packman 
 + code an ANN from scratch
@@ -11,6 +13,7 @@ once in his or her life every programer has to (my subjective pick):
 + more to come from quantum computing
 
 I'm getting older now, has to hurry up, writing code editor.
+
 
 ## Features
 - display file

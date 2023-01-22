@@ -30,6 +30,7 @@ typedef struct {
 } Line;
 
 typedef struct {
+    char *filepath;
     EMode mode;
     Line* lines;
     size_t total_size;

@@ -20,6 +20,7 @@
 
 int editor_init(Editor* e)
 {
+    e->filepath = NULL;
     e->lines = NULL;
     e->total_size = 0;
     e->crsr = (Cursor){0,0};
@@ -36,6 +37,11 @@ void editor_free(Editor *e)
 {
     if(e != NULL)
     {
+        if(e->filepath)
+        {
+            free(e->filepath);
+            e->filepath = NULL;
+        }
         if(e->search_field)
         {
             searchfield_free(e->search_field);
@@ -132,7 +138,6 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         v->scrollOffset.lines =e->crsr.line;
     }
 
-    fprintf(stderr, "d->lines=%zu, v-lines=%zu\n", disp->lines, v->lines);
     // render scroll
     for(size_t l=0; l<v->lines; l++)
     {
@@ -253,7 +258,7 @@ void editor_insert(Editor *e, const char *s)
         size_t needed_capcacity = strlen(s) + line.filled_size;
         if(needed_capcacity < line.total_size)
         {
-            fprintf(stderr, "-> no resize needed - line capacity %zu, needed %zu", line.total_size, needed_capcacity);
+            
             // entry fits current allocated line space
             assert(e->crsr.col+1 < line.total_size);
             size_t n = line.filled_size - e->crsr.col;
@@ -264,12 +269,12 @@ void editor_insert(Editor *e, const char *s)
         }
         else
         {
-            fprintf(stderr, "-> cur line |%s|\n", line.content);
-            fprintf(stderr, "-> line capacity %zu, count %zu\n", line.total_size, line.filled_size);
-            fprintf(stderr, "-> resize needed - line capacity %zu, needed %zu\n", line.total_size, needed_capcacity);
+            
+            
+            
             size_t new_total_size = line.total_size * LINE_GROTH_FACTOR;
             while(new_total_size < needed_capcacity) new_total_size *= LINE_GROTH_FACTOR; 
-            fprintf(stderr, "-> new capcacity %zu\n", new_total_size);
+            
             line.content = realloc(line.content, sizeof(char)*new_total_size);
             if(!line.content)
             {
@@ -277,11 +282,9 @@ void editor_insert(Editor *e, const char *s)
                 return;
             }
             line.total_size = new_total_size;
-            fprintf(stderr, "-> cur line extended |%s|\n", line.content);
-            fprintf(stderr, "-> line capacity %zu, count %zu\n", line.total_size, line.filled_size);
+            
             size_t n = line.filled_size - e->crsr.col;
-            fprintf(stderr, "-> bytes to shift %zu\n", n);
-            fprintf(stderr, "-> crsr at %zu, to insert %zu\n", e->crsr.col, strlen(s));
+            
             memcpy(&(line.content[e->crsr.col+strlen(s)]), &(line.content[e->crsr.col]),n);
             memcpy(&(line.content[e->crsr.col]), s, strlen(s));
             e->crsr.col += strlen(s);

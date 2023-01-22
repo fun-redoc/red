@@ -12,6 +12,7 @@
 #define ESCAPE    "\x1b"
 #define BACKSPACE "\x7f"
 #define DELETE    "\x1b\x5b\x33\x7e"
+#define CTRL_X    "\x18"
 
 // ANSI TERMINAL COMMANDS
 #define ANSI_HOME       "\033[H"

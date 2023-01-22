@@ -1,5 +1,5 @@
 // WORKING ON:
-// insert mode: save in line
+// saving on Ctrl-s
 // insert mode: delete
 // insert mode: backspace
 // search and jump to next search position
@@ -11,6 +11,9 @@
 // insert mode: fix move corsor behind the last char and insert at the end
 
 // BACKLOG:
+// bevore saving check if the file was changed in between
+// when opening with not existing file name create file
+// warn when quitting and not saved
 // goto line number
 // maybe Bug when row is empty (shows only #, which is but the sign for overscrolling a line aut of visible area)
 // : jump to the end or the beginning of line
@@ -64,7 +67,6 @@ void rerender_all()
     {
         case browse:
         {
-            fprintf(stderr, "BROWSE MODE\n");
             // adjust viewport after resize
             editor_viewport.lines = d.lines-2;
             editor_viewport.cols = d.cols-2;
@@ -73,7 +75,6 @@ void rerender_all()
         }
         case search:
         {
-            fprintf(stderr, "SEARCH MODE\n");
             // reserve bottom row for search word edditing
             // and clearly adjust to resize
             editor_viewport.lines = d.lines-2-1;
@@ -87,7 +88,6 @@ void rerender_all()
         }
         case insert:
         {
-            fprintf(stderr, "INSERT MODE\n");
             // reserve bottom row for search word edditing
             // and clearly adjust to resize
             editor_viewport.lines = d.lines-2-1;
@@ -255,6 +255,32 @@ void handle_leave_insert_mode(Editor *e, const char *s)
     editor_set_message(e, NULL); // means delete message
 }                                    
 
+void handle_save(Editor *e, const char *s)
+{                                    
+    assert(e && e->filepath);
+    FILE *f = fopen(e->filepath, "wb");
+    //FILE *f = fopen("save.test.txt", "wb");
+    if(!f)
+    {
+        fprintf(stderr, "ERROR: failed to open file %s for writing errno=%d (%s).\n", e->filepath, errno, strerror(errno));
+        longjmp(try, EXIT_FAILURE);
+    }
+    for(size_t i=0; i < e->total_size; i++)
+    {
+        if(EOF == fputs(e->lines[i].content, f))
+        {
+            fprintf(stderr, "ERROR: failed to save file %s for writing errno=%d (%s).\n", e->filepath, errno, strerror(errno));
+            longjmp(try, EXIT_FAILURE);
+        }
+        if(EOF == fputc('\n', f))
+        {
+            fprintf(stderr, "ERROR: failed to save file %s for writing errno=%d (%s).\n", e->filepath, errno, strerror(errno));
+            longjmp(try, EXIT_FAILURE);
+        }
+    }
+    fclose(f);
+}                                    
+
 int main(int argc, char* argv[])
 {
     int ret_val = 0;
@@ -271,6 +297,7 @@ int main(int argc, char* argv[])
         {browse, "\x1b\x5b\x42", handle_go_down},
         {browse, "s", handle_enter_search_mode},
         {browse, "i", handle_enter_insert_mode},
+        {browse, "\x18\x73", handle_save},
         {insert, "\x1b\x5b\x44", handle_go_left},
         {insert, "\x1b\x5b\x43", handle_go_right},
         {insert, "\x1b\x5b\x41", handle_go_up},
@@ -322,9 +349,9 @@ int main(int argc, char* argv[])
     while(!feof(f))
     {
         ssize_t ret = getline(&line, &line_len, f);
-        if(ret == -1)
+        if(ret == -1 && errno != 0)
         {
-            fprintf(stderr, "ERROR: failed to read file: %s.\n", strerror(errno));
+            fprintf(stderr, "ERROR: failed to read file: %d - %s.\n", errno, strerror(errno));
             GOTO_FINISH(1);
         }
         if(!editor_append_line(&e, line))
@@ -333,6 +360,20 @@ int main(int argc, char* argv[])
             GOTO_FINISH(1);
         }
     }
+
+    // close the file
+    if(f)
+    {
+        fclose(f);
+        f = NULL;
+    }
+
+    if(!(e.filepath = malloc(sizeof(char)*strlen(argv[1]))))
+    {
+        fprintf(stderr, "ERROR: failed to allocate file path.\n");
+        GOTO_FINISH(1);
+    }
+    memcpy(e.filepath, argv[1],strlen(argv[1]));
 
     // TODO get Terminal size to initialise display size
     if(EXIT_FAILURE == display_init(&d, 20,20))
@@ -385,7 +426,7 @@ int main(int argc, char* argv[])
         fprintf(stderr, "ERROR: caught an error\n");
         GOTO_FINISH(1);
     }
-    while (e.mode != quit) 
+    while(e.mode != quit) 
     {
         //uncomment to see ascii sequence while typing
         //if((ret_val=printt_escape_seq()) != 0) GOTO_FINISH(ret_val)
@@ -395,7 +436,8 @@ int main(int argc, char* argv[])
 
         char seq[MAX_ESC_SEQ_LEN] = {0};
         errno = 0;
-        int seq_len = read(STDIN_FILENO, seq, sizeof(seq));
+        int seq_len = 0;
+        seq_len += read(STDIN_FILENO, &(seq[seq_len]), sizeof(seq));
         if (errno == EINTR) 
         {
             // there was a signal from resize not an entry
@@ -408,8 +450,29 @@ int main(int argc, char* argv[])
             fprintf(stderr, "ERROR: error while reading input: %s\n", strerror(errno));
             GOTO_FINISH(1);
         }
-
         assert((size_t) seq_len < sizeof(seq));
+        if(strcmp(seq,CTRL_X) == 0)
+        {
+            seq_len += read(STDIN_FILENO, &(seq[seq_len]), sizeof(seq));
+            if (errno == EINTR) 
+            {
+                // there was a signal from resize not an entry
+                // resize is handled in the resize handler completly
+                // so ignore this here and loop
+                continue;
+            }
+            if (errno > 0) 
+            {
+                fprintf(stderr, "ERROR: error while reading input: %s\n", strerror(errno));
+                GOTO_FINISH(1);
+            }
+            assert((size_t) seq_len < sizeof(seq));
+            fprintf(stderr, "TRACE: ctrl-x seq: ");
+            for (int i = 0; i < seq_len; ++i) {
+                fprintf(stderr,"\\x%02x", seq[i]);
+            }
+            fprintf(stderr, "\"\n");
+        }
 
         void (*key_handler)(Editor*, const char*) = NULL;
         for(size_t i=0; i < LEN(handler_map); i++)
@@ -440,7 +503,6 @@ int main(int argc, char* argv[])
             default:
                 break;
             }
-
         }
     }
     
