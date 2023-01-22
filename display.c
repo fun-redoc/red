@@ -67,11 +67,9 @@ int display_resize(Display *d)
 
 void display_render_to_terminal(const Display *d)
 {
-    fprintf(stderr, "TRACE: entering display_render_to_terminal\n");
     fprintf(stdout, ANSI_HOME);
     fwrite(d->viewbuffer, sizeof(*d->viewbuffer), d->lines*d->cols, stdout);
     fprintf(stdout, ANSI_CURSOR_XY, d->crsr.line + 1, d->crsr.col + 1);
     fflush(stdout);
-    fprintf(stderr, "TRACE: leaving display_render_to_terminal\n");
 }
 

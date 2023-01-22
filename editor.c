@@ -97,17 +97,10 @@ bool editor_append_line(Editor *e, const char *s)
 
 void editor_render(const Editor *e, Viewport *v, Display *disp)
 {
-    fprintf(stderr, "TRACE: enter editor_render  !(%zu + %zu <= %zu)\n",v->x0,v->cols, disp->cols);
-    fprintf(stderr, "TRACE:                      !(%zu + %zu <= %zu)\n",v->y0,v->lines, disp->lines);
     assert(e!=NULL && disp!=NULL && v!=NULL);
     // viewport has to fit into Display
     if(!(v->x0 + v->cols <= disp->cols)) return;
     if(!(v->y0 + v->lines <= disp->lines)) return;
-
-    fprintf(stderr, "TRACE: in editor_render after checks \n");
-
-//    size_t cols_available  = viewport->cols  - viewport->x0;
-//    size_t lines_available = viewport->lines - viewport->y0;
     
     // prepare cursors
     // TODO maybe vieportOffset (scolling offset) ist better located in Display instead of Editor
@@ -117,19 +110,13 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         if(v->scrollOffset.cols + v->cols <= e->lines[e->crsr.line].filled_size)
         {
             v->scrollOffset.cols += 1;
-            fprintf(stderr, "TRACE: editor_render 1 -- scrl.col=%zu\n", v->scrollOffset.cols);
         }
     }
     //scroll to the left if necessary
     if(e->crsr.col >= 0 && 
        e->crsr.col < v->scrollOffset.cols)
     {
-        fprintf(stderr, "TRACE: editor_render 2 --crsr.col=%zu scrl.col=%zu\n",e->crsr.col, v->scrollOffset.cols);
-        //if(e->crsr.col < v->cols)
-        {
-            //v->scrollOffset.cols -= 1;
-            v->scrollOffset.cols = e->crsr.col;
-        }
+        v->scrollOffset.cols = e->crsr.col;
     }
     // scroll down
     if(e->crsr.line > v->lines-1)
@@ -159,8 +146,6 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         if(el < e->total_size)
         {
             size_t dlen = MIN(v->cols, e->lines[el].filled_size <= ec ? 0 : e->lines[el].filled_size - ec);
-            //size_t dlen = MIN(v->cols, MAX(0, e->lines[el].filled_size - ec));
-            fprintf(stderr, "TRACE: editor_render 3 -- scrl.col=%zu dlen=%zu\n", ec, dlen);
             if(dlen > 0) 
                 memcpy(&(disp->viewbuffer[(v->y0 + l)*disp->cols+ (v->x0)]), &(e->lines[el].content[ec]), dlen);
             if(dlen == 0) 
@@ -169,7 +154,6 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         }
         else
         {
-            fprintf(stderr, "TRACE: editor_render 4\n");
             disp->viewbuffer[(v->y0 + l)*disp->cols + (v->x0)] = EPMTY_LINE;
         }
 
@@ -179,10 +163,8 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
 
     // set cursor in scroll
     int crsr_col = e->crsr.col - v->scrollOffset.cols; // can get negative?
-    fprintf(stderr, "TRACE crsr_col=%d\n", crsr_col);
     disp->crsr.col  = v->x0 + MAX(0,crsr_col);
     disp->crsr.line = e->crsr.line - v->scrollOffset.lines +v->y0;
-    fprintf(stderr, "TRACE: leaving editor_render\n");
 }
 
 void editor_set_message(Editor *e, const char *s)
@@ -254,7 +236,6 @@ void editor_message_render(const Editor *e, const Viewport *v, Display *d)
        d->lines >= (v->y0 + v->lines) && 
        v->cols > e->message_count)
     {
-        //fprintf(stderr, "TRACE: rendering possible\n");
         size_t max_contet_len = MIN(e->message_count, v->cols);
         memset(&(d->viewbuffer[(v->y0)*d->cols+(v->x0)]), ' ', v->cols);
         memcpy(&(d->viewbuffer[(v->y0)*d->cols+(v->x0)]), e->message, max_contet_len);

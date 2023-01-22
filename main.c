@@ -1,9 +1,12 @@
 // WORKING ON:
-// fix abort in finish
-// fix scroll and movement
+// insert mode: save in line
+// insert mode: delete
+// insert mode: backspace
 // search and jump to next search position
 
 // READY
+// fix scroll and movement
+// fix abort in finish
 // fix resize in (tmux?)
 // insert mode: fix move corsor behind the last char and insert at the end
 
@@ -42,13 +45,16 @@
 #define INITIAL_STRING_BUFFER_SIZE 1
 #define GOTO_FINISH(_ret_val) { ret_val = (_ret_val); goto finish; }
 
+/*
+ * global variables
+ */
 jmp_buf try;
-
 Display d;
 Editor e;
-Viewport editor_viewport;  //= {2,2         ,d->lines-2,d->cols-2, (Scroll){0,0}};
-Viewport search_viewport;  //= {0,d->lines-1,1       ,d->cols, (Scroll){0,0}};
-Viewport message_viewport; //= {0,d->lines-1,1       ,d->cols, (Scroll){0,0}};
+Viewport editor_viewport;  
+Viewport search_viewport;  
+Viewport message_viewport; 
+
 
 void rerender_all()
 {
@@ -366,9 +372,6 @@ int main(int argc, char* argv[])
         GOTO_FINISH(1);
     }
 
-    //bool quit = false;
-    //rerender_all();
-    //if(!display_resize(&d)) GOTO_FINISH(1)
 
     editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
     search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
@@ -388,53 +391,7 @@ int main(int argc, char* argv[])
         //if((ret_val=printt_escape_seq()) != 0) GOTO_FINISH(ret_val)
         //else continue;
 
-        fprintf(stderr, "TRACE: begin of game loop\n");
-
         rerender_all();
-        //switch(e->mode)
-        //{
-        //    case browse:
-        //    {
-        //        fprintf(stderr, "BROWSE MODE\n");
-        //        // adjust viewport after resize
-        //        editor_viewport.lines = d->lines-2;
-        //        editor_viewport.cols = d->cols-2;
-        //        editor_render(e, &editor_viewport, d);
-        //        break;
-        //    }
-        //    case search:
-        //    {
-        //        fprintf(stderr, "SEARCH MODE\n");
-        //        // reserve bottom row for search word edditing
-        //        // and clearly adjust to resize
-        //        editor_viewport.lines = d->lines-1;
-        //        editor_viewport.cols = d->cols;
-        //        editor_render(e, &editor_viewport, d);
-
-        //        search_viewport.y0 = d->lines-1;
-        //        search_viewport.cols = d->cols;
-        //        searchfield_render(e->search_field, &search_viewport, d);
-        //        break;
-        //    }
-        //    case insert:
-        //    {
-        //        fprintf(stderr, "INSERT MODE\n");
-        //        // reserve bottom row for search word edditing
-        //        // and clearly adjust to resize
-        //        editor_viewport.lines = d->lines-1;
-        //        editor_viewport.cols = d->cols;
-        //        editor_render(e, &editor_viewport, d);
-
-        //        message_viewport.y0 = d->lines-1;
-        //        message_viewport.cols = d->cols;
-        //        editor_message_render(e, &message_viewport, d);
-        //        break;
-        //    }
-        //    default:
-        //        fprintf(stderr,"ERROR: unkown editor mode\n");
-        //        GOTO_FINISH(1);
-        //}
-        //display_render_to_terminal(d);
 
         char seq[MAX_ESC_SEQ_LEN] = {0};
         errno = 0;
@@ -444,10 +401,6 @@ int main(int argc, char* argv[])
             // there was a signal from resize not an entry
             // resize is handled in the resize handler completly
             // so ignore this here and loop
-            //if(EXIT_FAILURE == display_resize(&d)){
-            //    fprintf(stderr, "ERROR: failed to resize\n");
-            //    GOTO_FINISH(1);
-            //} 
             continue;
         }
         if (errno > 0) 
@@ -489,8 +442,8 @@ int main(int argc, char* argv[])
             }
 
         }
-        fprintf(stderr, "TRACE: end of game loop\n");
     }
+    
 finish:
     fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
     fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
