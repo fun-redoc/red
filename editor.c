@@ -121,13 +121,15 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         }
     }
     //scroll to the left if necessary
-    if(e->crsr.col < v->scrollOffset.cols)
+    if(e->crsr.col >= 0 && 
+       e->crsr.col < v->scrollOffset.cols)
     {
-        if(e->crsr.col < v->cols)
+        fprintf(stderr, "TRACE: editor_render 2 --crsr.col=%zu scrl.col=%zu\n",e->crsr.col, v->scrollOffset.cols);
+        //if(e->crsr.col < v->cols)
         {
-            v->scrollOffset.cols -= 1;
+            //v->scrollOffset.cols -= 1;
+            v->scrollOffset.cols = e->crsr.col;
         }
-        fprintf(stderr, "TRACE: editor_render 2 -- scrl.col=%zu\n", v->scrollOffset.cols);
     }
     // scroll down
     if(e->crsr.line > v->lines-1)

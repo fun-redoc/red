@@ -168,26 +168,8 @@ void handle_quit(Editor *e, const char* s)
 }
 void handle_go_right(Editor *e, const char* s)
 {
-    if(e->mode==browse)
-    {
-        if(!(e->crsr.col >= e->lines[e->crsr.line].filled_size))
-        {
-            e->crsr.col += 1;
-        }
-        else
-        {
-            e->crsr.col = e->lines[e->crsr.line].filled_size;
-        }
-    }
-    if(e->mode==insert)
-    {
-
-        if(!(e->crsr.col >= e->lines[e->crsr.line].filled_size))
-        {
-            e->crsr.col += 1;
-        }   
-    }
-
+    e->crsr.col += 1;
+    e->crsr.col = MIN(e->crsr.col, MAX(0,e->lines[e->crsr.line].filled_size));
 }
 void handle_go_left(Editor *e, const char* s)
 {
@@ -199,7 +181,7 @@ void handle_go_down(Editor *e, const char* s)
     {
         e->crsr.line += 1;
     }
-    //e->crsr.col = MIN(e->crsr.col, MAX(0,e->lines[e->crsr.line].filled_size));
+    e->crsr.col = MIN(e->crsr.col, MAX(0,e->lines[e->crsr.line].filled_size));
 }
 void handle_go_up(Editor *e, const char* s)
 {
@@ -207,7 +189,7 @@ void handle_go_up(Editor *e, const char* s)
     {
         e->crsr.line -= 1;
     }
-    //e->crsr.col = MIN(e->crsr.col, MAX(0,e->lines[e->crsr.line].filled_size));
+    e->crsr.col = MIN(e->crsr.col, MAX(0,e->lines[e->crsr.line].filled_size));
 }
 void handle_enter_search_mode(Editor *e, const char*s)
 {
