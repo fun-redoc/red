@@ -254,47 +254,69 @@ void editor_insert(Editor *e, const char *s)
     if(e->total_size > e->crsr.line)
     {
         // edit exising line
-        #define line (e->lines[e->crsr.line])
-        size_t needed_capcacity = strlen(s) + line.filled_size;
-        if(needed_capcacity < line.total_size)
+        #define cur_line (e->lines[e->crsr.line])
+        size_t needed_capcacity = strlen(s) + cur_line.filled_size;
+        if(needed_capcacity < cur_line.total_size)
         {
             
-            // entry fits current allocated line space
-            assert(e->crsr.col+1 < line.total_size);
-            size_t n = line.filled_size - e->crsr.col;
-            memcpy(&(line.content[e->crsr.col+strlen(s)]), &(line.content[e->crsr.col]),n);
-            memcpy(&(line.content[e->crsr.col]), s, strlen(s));
+            // entry fits current allocated cur_line.space
+            assert(e->crsr.col+1 < cur_line.total_size);
+            size_t n = cur_line.filled_size - e->crsr.col;
+            memcpy(&(cur_line.content[e->crsr.col+strlen(s)]), &(cur_line.content[e->crsr.col]),n);
+            memcpy(&(cur_line.content[e->crsr.col]), s, strlen(s));
             e->crsr.col += strlen(s);
-            line.filled_size += strlen(s);
+            cur_line.filled_size += strlen(s);
         }
         else
         {
             
             
             
-            size_t new_total_size = line.total_size * LINE_GROTH_FACTOR;
+            size_t new_total_size = cur_line.total_size * LINE_GROTH_FACTOR;
             while(new_total_size < needed_capcacity) new_total_size *= LINE_GROTH_FACTOR; 
             
-            line.content = realloc(line.content, sizeof(char)*new_total_size);
-            if(!line.content)
+            cur_line.content = realloc(cur_line.content, sizeof(char)*new_total_size);
+            if(!cur_line.content)
             {
                 fprintf(stderr, "ERROR: failed to alloc memory, cannot insert (%d) %s\n", errno, strerror(errno));
                 return;
             }
-            line.total_size = new_total_size;
+            cur_line.total_size = new_total_size;
             
-            size_t n = line.filled_size - e->crsr.col;
+            size_t n = cur_line.filled_size - e->crsr.col;
             
-            memcpy(&(line.content[e->crsr.col+strlen(s)]), &(line.content[e->crsr.col]),n);
-            memcpy(&(line.content[e->crsr.col]), s, strlen(s));
+            memcpy(&(cur_line.content[e->crsr.col+strlen(s)]), &(cur_line.content[e->crsr.col]),n);
+            memcpy(&(cur_line.content[e->crsr.col]), s, strlen(s));
             e->crsr.col += strlen(s);
-            line.filled_size += strlen(s);
+            cur_line.filled_size += strlen(s);
         }
     }
     else
     {
         // TODO append line
         assert(0 && "not yetz implemented");
+    }
+}
+
+void editor_delete_at_crsr(Editor *e)
+{
+    assert(e && e->lines);
+    if(e->crsr.line>=0 && e->crsr.line < e->total_size)
+    {
+        if(e->lines[e->crsr.line].filled_size > e->crsr.col && e->crsr.col >= 0)
+        {
+            memmove(&(e->lines[e->crsr.line].content[e->crsr.col]),
+                    &(e->lines[e->crsr.line].content[e->crsr.col+1]),
+                    e->lines[e->crsr.line].filled_size - e->crsr.col - 1
+            ); 
+            e->lines[e->crsr.line].filled_size -= 1;
+            e->lines[e->crsr.line].content[e->lines[e->crsr.line].filled_size] = '\0';
+            assert(e->lines[e->crsr.line].filled_size >= 0);
+            if(e->crsr.col >= e->lines[e->crsr.line].filled_size-1)
+            {
+                e->crsr.col = e->lines[e->crsr.line].filled_size-1;
+            }
+        }
     }
 }
 

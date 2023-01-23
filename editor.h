@@ -54,6 +54,7 @@ void editor_free(Editor *e);
 bool editor_append_line(Editor *e, const char *s);
 void editor_render(const Editor *e, Viewport *viewport, Display *d);
 void editor_insert(Editor *e, const char *s);
+void editor_delete_at_crsr(Editor *e);
 
 void editor_set_message(Editor *e, const char *s);
 void editor_message_render(const Editor *e, const Viewport *v, Display *d);

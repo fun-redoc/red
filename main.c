@@ -1,16 +1,19 @@
 // WORKING ON:
-// saving on Ctrl-s
-// insert mode: delete
-// insert mode: backspace
-// search and jump to next search position
+// append line
 
 // READY
+// insert mode: delete
+// saving on Ctrl-s
 // fix scroll and movement
 // fix abort in finish
 // fix resize in (tmux?)
 // insert mode: fix move corsor behind the last char and insert at the end
 
 // BACKLOG:
+// insert mode: backspace
+// show message when saved, hide message on following action
+// search and jump to next search position
+// warn when quit without saving edited text
 // bevore saving check if the file was changed in between
 // when opening with not existing file name create file
 // warn when quitting and not saved
@@ -245,9 +248,13 @@ void handle_right_insert_mode(Editor *e, const char *s)
 {                                    
     assert(0 && "unimplemented");
 }
+void handle_delete_browse_mode(Editor *e, const char *s)
+{
+    editor_delete_at_crsr(e);
+}
 void handle_delete_insert_mode(Editor *e, const char *s)
 {
-    assert(0 && "unimplemented");
+    editor_delete_at_crsr(e);
 }
 void handle_leave_insert_mode(Editor *e, const char *s)
 {                                    
@@ -295,6 +302,8 @@ int main(int argc, char* argv[])
         {browse, "\x1b\x5b\x43", handle_go_right},
         {browse, "\x1b\x5b\x41", handle_go_up},
         {browse, "\x1b\x5b\x42", handle_go_down},
+        {browse, "\x7f", handle_delete_browse_mode},
+        {browse, "\x04", handle_delete_browse_mode},
         {browse, "s", handle_enter_search_mode},
         {browse, "i", handle_enter_insert_mode},
         {browse, "\x18\x73", handle_save},
@@ -302,6 +311,7 @@ int main(int argc, char* argv[])
         {insert, "\x1b\x5b\x43", handle_go_right},
         {insert, "\x1b\x5b\x41", handle_go_up},
         {insert, "\x1b\x5b\x42", handle_go_down},
+        {insert, "\x18\x73", handle_save},
         {insert, "\x7f", handle_delete_insert_mode},
         {insert, "\x04", handle_delete_insert_mode},
         {insert, ESCAPE, handle_leave_insert_mode},
@@ -354,10 +364,13 @@ int main(int argc, char* argv[])
             fprintf(stderr, "ERROR: failed to read file: %d - %s.\n", errno, strerror(errno));
             GOTO_FINISH(1);
         }
-        if(!editor_append_line(&e, line))
+        if(ret != -1)
         {
-            fprintf(stderr, "ERROR: failed to load file.\n");
-            GOTO_FINISH(1);
+            if(!editor_append_line(&e, line))
+            {
+                fprintf(stderr, "ERROR: failed to load file.\n");
+                GOTO_FINISH(1);
+            }
         }
     }
 
