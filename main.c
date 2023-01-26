@@ -1,7 +1,8 @@
 // WORKING ON:
-// append line
+// append line  implement     {insert, "\x0a", handle_insert_cr},
 
 // READY
+// insert mode: backspace
 // insert mode: delete
 // saving on Ctrl-s
 // fix scroll and movement
@@ -10,7 +11,7 @@
 // insert mode: fix move corsor behind the last char and insert at the end
 
 // BACKLOG:
-// insert mode: backspace
+// make keybinding configurable via config file (JSON)
 // show message when saved, hide message on following action
 // search and jump to next search position
 // warn when quit without saving edited text
@@ -248,6 +249,14 @@ void handle_right_insert_mode(Editor *e, const char *s)
 {                                    
     assert(0 && "unimplemented");
 }
+void handle_backspace_browse_mode(Editor *e, const char *s)
+{
+    editor_backspace_at_crsr(e);
+}
+void handle_backspace_insert_mode(Editor *e, const char *s)
+{
+    editor_backspace_at_crsr(e);
+}
 void handle_delete_browse_mode(Editor *e, const char *s)
 {
     editor_delete_at_crsr(e);
@@ -261,6 +270,25 @@ void handle_leave_insert_mode(Editor *e, const char *s)
     e->mode = browse;                                    
     editor_set_message(e, NULL); // means delete message
 }                                    
+
+void handle_browse_cr(Editor *e, const char *s)
+{
+    if(e->crsr.line+1 < e->total_size)
+    {
+        e->crsr.line += 1;
+        e->crsr.col = 0;
+    }
+}
+
+void handle_browse_to_end_of_line(Editor *e, const char *s)
+{
+    e->crsr.col = MAX(0, e->lines[e->crsr.line].filled_size-1);
+}
+
+void handle_browse_to_begin_of_line(Editor *e, const char *s)
+{
+    e->crsr.col = 0;
+}
 
 void handle_save(Editor *e, const char *s)
 {                                    
@@ -302,19 +330,24 @@ int main(int argc, char* argv[])
         {browse, "\x1b\x5b\x43", handle_go_right},
         {browse, "\x1b\x5b\x41", handle_go_up},
         {browse, "\x1b\x5b\x42", handle_go_down},
-        {browse, "\x7f", handle_delete_browse_mode},
+        {browse, "\x7f", handle_backspace_browse_mode},
         {browse, "\x04", handle_delete_browse_mode},
+        {browse, "\x18\x73", handle_save},
+        {browse, "\x0a", handle_browse_cr},
+        {browse, "$", handle_browse_to_end_of_line},
+        {browse, "0", handle_browse_to_begin_of_line},
+//        {browse, "\x5e", handle_browse_to_first_non_blank},
         {browse, "s", handle_enter_search_mode},
         {browse, "i", handle_enter_insert_mode},
-        {browse, "\x18\x73", handle_save},
         {insert, "\x1b\x5b\x44", handle_go_left},
         {insert, "\x1b\x5b\x43", handle_go_right},
         {insert, "\x1b\x5b\x41", handle_go_up},
         {insert, "\x1b\x5b\x42", handle_go_down},
         {insert, "\x18\x73", handle_save},
-        {insert, "\x7f", handle_delete_insert_mode},
+        {insert, "\x7f", handle_backspace_insert_mode},
         {insert, "\x04", handle_delete_insert_mode},
         {insert, ESCAPE, handle_leave_insert_mode},
+//        {insert, "\x0a", handle_insert_cr},
         {search, ESCAPE, handle_leave_search_mode},
         {search, "\x7f", handle_delete_search_mode},
         {search, "\x04", handle_delete_search_mode},

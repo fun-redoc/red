@@ -298,26 +298,58 @@ void editor_insert(Editor *e, const char *s)
     }
 }
 
-void editor_delete_at_crsr(Editor *e)
+void editor_delete_at_xy(Editor *e, size_t x, size_t y)
 {
     assert(e && e->lines);
-    if(e->crsr.line>=0 && e->crsr.line < e->total_size)
+    if(y>=0 && y< e->total_size)
     {
-        if(e->lines[e->crsr.line].filled_size > e->crsr.col && e->crsr.col >= 0)
+        if(e->lines[y].filled_size > x && x >= 0)
         {
-            memmove(&(e->lines[e->crsr.line].content[e->crsr.col]),
-                    &(e->lines[e->crsr.line].content[e->crsr.col+1]),
-                    e->lines[e->crsr.line].filled_size - e->crsr.col - 1
+            memmove(&(e->lines[y].content[x]),
+                    &(e->lines[y].content[x+1]),
+                    e->lines[y].filled_size - x - 1
             ); 
-            e->lines[e->crsr.line].filled_size -= 1;
-            e->lines[e->crsr.line].content[e->lines[e->crsr.line].filled_size] = '\0';
-            assert(e->lines[e->crsr.line].filled_size >= 0);
-            if(e->crsr.col >= e->lines[e->crsr.line].filled_size-1)
-            {
-                e->crsr.col = e->lines[e->crsr.line].filled_size-1;
-            }
+            e->lines[y].filled_size -= 1;
+            e->lines[y].content[e->lines[y].filled_size] = '\0';
+            assert(e->lines[y].filled_size >= 0);
         }
     }
+}
+
+
+void editor_backspace_at_crsr(Editor *e)
+{
+    editor_delete_at_xy(e, e->crsr.col-1, e->crsr.line);
+    if(e->crsr.col > 0)
+    {
+        e->crsr.col -= 1;
+    }
+}
+void editor_delete_at_crsr(Editor *e)
+{
+    editor_delete_at_xy(e, e->crsr.col, e->crsr.line);
+    if(e->crsr.col >= e->lines[e->crsr.line].filled_size-1)
+    {
+        e->crsr.col = e->lines[e->crsr.line].filled_size-1;
+    }
+    //assert(e && e->lines);
+    //if(e->crsr.line>=0 && e->crsr.line < e->total_size)
+    //{
+    //    if(e->lines[e->crsr.line].filled_size > e->crsr.col && e->crsr.col >= 0)
+    //    {
+    //        memmove(&(e->lines[e->crsr.line].content[e->crsr.col]),
+    //                &(e->lines[e->crsr.line].content[e->crsr.col+1]),
+    //                e->lines[e->crsr.line].filled_size - e->crsr.col - 1
+    //        ); 
+    //        e->lines[e->crsr.line].filled_size -= 1;
+    //        e->lines[e->crsr.line].content[e->lines[e->crsr.line].filled_size] = '\0';
+    //        assert(e->lines[e->crsr.line].filled_size >= 0);
+    //        if(e->crsr.col >= e->lines[e->crsr.line].filled_size-1)
+    //        {
+    //            e->crsr.col = e->lines[e->crsr.line].filled_size-1;
+    //        }
+    //    }
+    //}
 }
 
 #endif
