@@ -1,14 +1,6 @@
 // WORKING ON:
-// append line  implement     {insert, "\x0a", handle_insert_cr},
-
-// READY
-// insert mode: backspace
-// insert mode: delete
-// saving on Ctrl-s
-// fix scroll and movement
-// fix abort in finish
-// fix resize in (tmux?)
-// insert mode: fix move corsor behind the last char and insert at the end
+// delete empty line
+// delete not empty line
 
 // BACKLOG:
 // make keybinding configurable via config file (JSON)
@@ -27,6 +19,17 @@
 // append to Line
 // append new line
 // move cursor in insert mode (emacs commands, arrow keys)
+
+// READY
+// append line  implement     {insert, "\x0a", handle_insert_cr},
+// insert mode: backspace
+// insert mode: delete
+// saving on Ctrl-s
+// fix scroll and movement
+// fix abort in finish
+// fix resize in (tmux?)
+// insert mode: fix move corsor behind the last char and insert at the end
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -280,6 +283,72 @@ void handle_browse_cr(Editor *e, const char *s)
     }
 }
 
+void handle_insert_cr(Editor *e, const char *s)
+{
+    // TODO starting from here there is a seg fault
+    Line *l = &(e->lines[e->crsr.line]);
+    char *r = &(l->content[e->crsr.col]);
+    size_t len = l->filled_size - e->crsr.col;
+    size_t next_line = e->crsr.line + 1;
+    if(next_line <= e->total_size)
+    {
+        // insert line
+        size_t new_size = e->total_size + 1;
+        e->lines = realloc(e->lines, sizeof(Line)*(new_size));
+        // TODO think on using memmove
+        /*
+        1aaaaa (crsr.col = 2 crsr.line = 1)
+        2bbbbb <-
+        3ccccc
+        4ddddd (total_size = 4; new_size = 5; next_line = 2)
+           ::becomes
+        1aaaaa
+        2bb    
+        bbb    <- next_line
+        3ccccc <- end of copy
+        4ddddd <- new_size-1
+        */
+        for(size_t i=new_size-1; i>=next_line+1; i--)
+        {
+            e->lines[i] = e->lines[i-1];
+        }
+        e->lines[next_line].content = malloc(sizeof(char)*len);
+        e->lines[next_line].filled_size = len;
+        e->lines[next_line].total_size = len;
+        memmove(e->lines[next_line].content, 
+                &(e->lines[e->crsr.line].content[e->crsr.col]),
+                len);
+        memset(&(e->lines[e->crsr.line].content[e->crsr.col]), '\0', len);
+        e->lines[e->crsr.line].filled_size -= len;
+        /*
+        L1: 123456789
+                ^
+            L1:total_size  = 11
+            L1:filled_size = 9
+            crsr.col = 4
+            len = filled_size - crsr.col = 9 - 4 = 5
+        =>becomes
+        123456789
+        1234.....
+        56789
+        ^
+            L1:total_size = 11
+            l1:filled_size = old filled_size - len = 9 - 5=4
+        */
+
+        e->total_size = new_size;
+        e->crsr.line += 1;
+        e->crsr.col = 0;
+    }
+    else
+    {
+        // append line
+        assert(0 && "not yet implementd");
+    }
+
+
+}
+
 void handle_browse_to_end_of_line(Editor *e, const char *s)
 {
     e->crsr.col = MAX(0, e->lines[e->crsr.line].filled_size-1);
@@ -316,44 +385,177 @@ void handle_save(Editor *e, const char *s)
     fclose(f);
 }                                    
 
+KeyHandler handler_map[] = {
+    {browse, "q", handle_quit},
+    {browse, "l", handle_go_right},
+    {browse, "h", handle_go_left},
+    {browse, "j", handle_go_down},
+    {browse, "k", handle_go_up},
+    {browse, "\x1b\x5b\x44", handle_go_left},
+    {browse, "\x1b\x5b\x43", handle_go_right},
+    {browse, "\x1b\x5b\x41", handle_go_up},
+    {browse, "\x1b\x5b\x42", handle_go_down},
+    {browse, "\x7f", handle_backspace_browse_mode},
+    {browse, "\x04", handle_delete_browse_mode},
+    {browse, "\x18\x73", handle_save},
+    {browse, "\x0a", handle_browse_cr},
+    {browse, "$", handle_browse_to_end_of_line},
+    {browse, "0", handle_browse_to_begin_of_line},
+//        {browse, "\x5e", handle_browse_to_first_non_blank},
+    {browse, "s", handle_enter_search_mode},
+    {browse, "i", handle_enter_insert_mode},
+    {insert, "\x1b\x5b\x44", handle_go_left},
+    {insert, "\x1b\x5b\x43", handle_go_right},
+    {insert, "\x1b\x5b\x41", handle_go_up},
+    {insert, "\x1b\x5b\x42", handle_go_down},
+    {insert, "\x18\x73", handle_save},
+    {insert, "\x7f", handle_backspace_insert_mode},
+    {insert, "\x04", handle_delete_insert_mode},
+    {insert, ESCAPE, handle_leave_insert_mode},
+    {insert, "\x0a", handle_insert_cr},
+    {search, ESCAPE, handle_leave_search_mode},
+    {search, "\x7f", handle_delete_search_mode},
+    {search, "\x04", handle_delete_search_mode},
+    {search, "\x1b\x5b\x44", handle_left_search_mode},
+    {search, "\x1b\x5b\x43", handle_right_search_mode},
+};
+
+int main_test_insert_in_the_middle_of_a_line()
+{
+    // TEST
+    int ret_val = 0;
+    char *line = NULL;
+    const char * test_file = "test.txt";
+
+    if(!file_exists(test_file)) 
+    {
+        fprintf(stderr, "ERROR: file does not exists %s.\n", strerror(errno));
+        GOTO_FINISH(1);
+    }
+
+    MAYBE(size_t) size = file_size(test_file);
+    if(IS_NOTHING2(size))
+    {
+        fprintf(stderr, "ERROR cannot determin file size %s.\n", strerror(errno));
+        GOTO_FINISH(1);
+    }
+    if(MAYBE_VALUE_ACCESS(size) == 0)
+    {
+        fprintf(stderr, "ERROR File is empty.\n");
+        GOTO_FINISH(1);
+    }
+
+    if(EXIT_FAILURE == editor_init(&e)) 
+    {
+        fprintf(stderr, "ERROR: failed to allocate editor.\n");
+        GOTO_FINISH(1);     
+    } 
+
+    FILE* f = fopen(test_file, "rb");
+    if(!f)
+    {
+        fprintf(stderr, "ERROR: failed to open filed %s. Reaseon: %s.\n", test_file, strerror(errno));
+        GOTO_FINISH(1);
+    }
+
+    size_t line_len = 80;
+    line = malloc(sizeof(char)*line_len);
+    while(!feof(f))
+    {
+        ssize_t ret = getline(&line, &line_len, f);
+        if(ret == -1 && errno != 0)
+        {
+            fprintf(stderr, "ERROR: failed to read file: %d - %s.\n", errno, strerror(errno));
+            GOTO_FINISH(1);
+        }
+        if(ret != -1)
+        {
+            if(!editor_append_line(&e, line))
+            {
+                fprintf(stderr, "ERROR: failed to load file.\n");
+                GOTO_FINISH(1);
+            }
+        }
+    }
+
+    // close the file
+    if(f)
+    {
+        fclose(f);
+        f = NULL;
+    }
+
+    if(!(e.filepath = malloc(sizeof(char)*strlen(test_file))))
+    {
+        fprintf(stderr, "ERROR: failed to allocate file path.\n");
+        GOTO_FINISH(1);
+    }
+    memcpy(e.filepath, test_file,strlen(test_file));
+
+    // TODO get Terminal size to initialise display size
+    if(EXIT_FAILURE == display_init(&d, 20,20))
+    {
+        fprintf(stderr, "ERROR: failed to allocate display.\n");
+        GOTO_FINISH(1);     
+    } 
+
+    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
+    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+
+    // using lonjump to be able to handle exceptions from resize handler appropriatelly
+    // kind of try-catch with no syntactic sugar
+    int catch_exception = setjmp(try);
+    if(catch_exception==EXIT_FAILURE)
+    {
+        fprintf(stderr, "ERROR: caught an error\n");
+        GOTO_FINISH(1);
+    }
+    //while(e.mode != quit) 
+    {
+        //uncomment to see ascii sequence while typing
+        //if((ret_val=printt_escape_seq()) != 0) GOTO_FINISH(ret_val)
+        //else continue;
+
+        editor_viewport.lines = d.lines-2-1;
+        editor_viewport.cols = d.cols-2;
+        editor_render(&e, &editor_viewport, &d);
+
+        message_viewport.y0 = d.lines-1;
+        message_viewport.cols = d.cols;
+        editor_message_render(&e, &message_viewport, &d);
+
+        e.crsr.line = 1;
+        e.crsr.col = 15;
+        handle_insert_cr(&e, NULL);
+
+        editor_render(&e, &editor_viewport, &d);
+        editor_message_render(&e, &message_viewport, &d);
+    }
+    
+finish:
+    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
+    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+    //if (terminal_ready) 
+    //{
+    //    // reset treminal 
+    //    printf("\033[2J");
+    //    term.c_lflag |= ECHO;
+    //    term.c_lflag |= ICANON;
+    //    tcsetattr(STDIN_FILENO, 0, &term);
+    //}
+    if(line) free(line);
+    editor_free(&e);
+    display_free(&d);
+    if(f) fclose(f);
+    return ret_val;
+}
+
 int main(int argc, char* argv[])
 {
     int ret_val = 0;
     char *line = NULL;
-    KeyHandler handler_map[] = {
-        {browse, "q", handle_quit},
-        {browse, "l", handle_go_right},
-        {browse, "h", handle_go_left},
-        {browse, "j", handle_go_down},
-        {browse, "k", handle_go_up},
-        {browse, "\x1b\x5b\x44", handle_go_left},
-        {browse, "\x1b\x5b\x43", handle_go_right},
-        {browse, "\x1b\x5b\x41", handle_go_up},
-        {browse, "\x1b\x5b\x42", handle_go_down},
-        {browse, "\x7f", handle_backspace_browse_mode},
-        {browse, "\x04", handle_delete_browse_mode},
-        {browse, "\x18\x73", handle_save},
-        {browse, "\x0a", handle_browse_cr},
-        {browse, "$", handle_browse_to_end_of_line},
-        {browse, "0", handle_browse_to_begin_of_line},
-//        {browse, "\x5e", handle_browse_to_first_non_blank},
-        {browse, "s", handle_enter_search_mode},
-        {browse, "i", handle_enter_insert_mode},
-        {insert, "\x1b\x5b\x44", handle_go_left},
-        {insert, "\x1b\x5b\x43", handle_go_right},
-        {insert, "\x1b\x5b\x41", handle_go_up},
-        {insert, "\x1b\x5b\x42", handle_go_down},
-        {insert, "\x18\x73", handle_save},
-        {insert, "\x7f", handle_backspace_insert_mode},
-        {insert, "\x04", handle_delete_insert_mode},
-        {insert, ESCAPE, handle_leave_insert_mode},
-//        {insert, "\x0a", handle_insert_cr},
-        {search, ESCAPE, handle_leave_search_mode},
-        {search, "\x7f", handle_delete_search_mode},
-        {search, "\x04", handle_delete_search_mode},
-        {search, "\x1b\x5b\x44", handle_left_search_mode},
-        {search, "\x1b\x5b\x43", handle_right_search_mode},
-    };
 
     assert(argc == 2 && "ERROR: you have to provide a file name");
     if(!file_exists(argv[1])) 

@@ -52,6 +52,11 @@ int display_resize(Display *d)
         fprintf(stderr,"ERROR: Failed to receive signal, ioctl terminated with Error %d (%s).\n", err, strerror(err));
         return EXIT_FAILURE;
     }
+    if(w.ws_col <= 0 || w.ws_row <= 0)
+    {
+        fprintf(stderr,"ERROR: Too smal dims cols=%d rows=%d.\n", w.ws_col, w.ws_row);
+        return EXIT_FAILURE;
+    }
     d->lines = w.ws_row;
     d->cols = w.ws_col;
     d->viewbuffer = realloc(d->viewbuffer, d->lines*d->cols*sizeof(*d->viewbuffer));
