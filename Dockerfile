@@ -36,4 +36,4 @@ RUN gcc search_field.c display.c editor.c main.c -g -g3 -ggdb -O0 -o red
 # Run the output program from the previous step
 #CMD ["ls", "-a"]
 #CMD ["./red", "test.txt"]
-CMD [ "valgrind", "--tool=memcheck", "--leak-check=yes", "--show-reachable=yes", "--num-callers=20", "--track-fds=yes", "--track-origins=yes", "./red", "test.txt"]
+CMD [ "valgrind", "-s", "--tool=memcheck", "--leak-check=yes", "--show-reachable=yes", "--num-callers=20", "--track-fds=yes", "--track-origins=yes", "./red", "test.txt"]

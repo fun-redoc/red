@@ -74,33 +74,48 @@ void searchfield_render(const SearchField *sf, Viewport *v, Display *d)
     }
 }
 
-    void searchfield_delete(SearchField *sf)
+void searchfield_delete(SearchField *sf)
+{
+    fprintf(stderr, "TRACE: searchfield delete\n");
+    if(sf->content_count > 0 && sf->crsr.col > 0)
     {
-        fprintf(stderr, "TRACE: searchfield delete\n");
-        if(sf->content_count > 0 && sf->crsr.col > 0)
+        if(sf->crsr.col > sf->content_count)
         {
-            if(sf->crsr.col > sf->content_count)
-            {
-                fprintf(stderr, "TRACE: searchfield delete - nothing to delete only coursor move\n");
-                sf->crsr.col -= 1;
-            }
-            else
-            {
-                fprintf(stderr, "TRACE: searchfield delete - realy deleteing\n");
-                size_t l = sf->content_capacity-sf->crsr.col;
-                fprintf(stderr, "crsr.col=%zu, amount=%zu\n", sf->crsr.col, l);
-                memmove(&(sf->content[sf->crsr.col-1]),&(sf->content[sf->crsr.col]),l);
-                sf->content_count -= 1;
-                sf->crsr.col -= 1;
-            }
+            fprintf(stderr, "TRACE: searchfield delete - nothing to delete only coursor move\n");
+            sf->crsr.col -= 1;
+        }
+        else
+        {
+            fprintf(stderr, "TRACE: searchfield delete - realy deleteing\n");
+            size_t l = sf->content_capacity-sf->crsr.col;
+            fprintf(stderr, "crsr.col=%zu, amount=%zu\n", sf->crsr.col, l);
+            memmove(&(sf->content[sf->crsr.col-1]),&(sf->content[sf->crsr.col]),l);
+            sf->content_count -= 1;
+            sf->crsr.col -= 1;
         }
     }
-    void searchfield_move_left(SearchField *sf)
-    {
-        if(sf->crsr.col > 0) sf->crsr.col -= 1;
-    }
-    void searchfield_move_right(SearchField *sf)
-    {
-        if(sf->crsr.col < sf->content_count) sf->crsr.col += 1;
+}
+void searchfield_move_left(SearchField *sf)
+{
+    if(sf->crsr.col > 0) sf->crsr.col -= 1;
+}
+void searchfield_move_right(SearchField *sf)
+{
+    if(sf->crsr.col < sf->content_count) sf->crsr.col += 1;
 
+}
+
+
+bool searchfield_equal(const SearchField *s1, const SearchField *s2)
+{
+    //bool res = (s1 != NULL) ==> (s2 != NULL);
+    bool res = !(s1 != NULL) || (s2 != NULL);
+    if(res && s1 && s2) 
+    {
+        res &= s1->crsr.col == s2->crsr.col && s1->crsr.line == s2->crsr.line;
+        //res &= s1->content_capacity == s2->content_capacity;
+        res &= s1->content_count == s2->content_count;
+        res &= (0 == strncmp(s1->content, s2->content, s1->content_count));
     }
+    return res;
+}

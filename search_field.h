@@ -24,4 +24,6 @@ void searchfield_delete(SearchField *sf);
 void searchfield_move_left(SearchField *sf);
 void searchfield_move_right(SearchField *sf);
 
+bool searchfield_equal(const SearchField *s1, const SearchField *s2);
+
 #endif

@@ -1,5 +1,6 @@
 // WORKING ON:
 // delete empty line
+// backspace at crsr.col = 0 (append to prev line)
 // delete not empty line
 
 // BACKLOG:
@@ -288,6 +289,7 @@ void handle_insert_cr(Editor *e, const char *s)
     // TODO starting from here there is a seg fault
     Line *l = &(e->lines[e->crsr.line]);
     char *r = &(l->content[e->crsr.col]);
+    if(l->filled_size < e->crsr.col) return;
     size_t len = l->filled_size - e->crsr.col;
     size_t next_line = e->crsr.line + 1;
     if(next_line <= e->total_size)
@@ -420,79 +422,48 @@ KeyHandler handler_map[] = {
     {search, "\x1b\x5b\x43", handle_right_search_mode},
 };
 
-int main_test_insert_in_the_middle_of_a_line()
+int test_insert_in_the_middle_of_a_line()
 {
     // TEST
     int ret_val = 0;
     char *line = NULL;
     const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file));
+    char *fname1 = malloc(strlen(test_file));
 
-    if(!file_exists(test_file)) 
-    {
-        fprintf(stderr, "ERROR: file does not exists %s.\n", strerror(errno));
-        GOTO_FINISH(1);
-    }
+    Editor tested = {
+    strcpy(fname, test_file),
+    insert,
+    NULL,
+    0,
+    {1,6},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&tested, "1.123456789");
+    editor_append_line(&tested, "2.123456789");
+    editor_append_line(&tested, "3.123456789");
 
-    MAYBE(size_t) size = file_size(test_file);
-    if(IS_NOTHING2(size))
-    {
-        fprintf(stderr, "ERROR cannot determin file size %s.\n", strerror(errno));
-        GOTO_FINISH(1);
-    }
-    if(MAYBE_VALUE_ACCESS(size) == 0)
-    {
-        fprintf(stderr, "ERROR File is empty.\n");
-        GOTO_FINISH(1);
-    }
+    Editor expected = {
+    strcpy(fname1, test_file),
+    insert,
+    NULL,
+    0,
+    {2,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&expected, "1.123456789");
+    editor_append_line(&expected, "2.1234");
+    editor_append_line(&expected, "56789");
+    editor_append_line(&expected, "3.123456789");
 
-    if(EXIT_FAILURE == editor_init(&e)) 
-    {
-        fprintf(stderr, "ERROR: failed to allocate editor.\n");
-        GOTO_FINISH(1);     
-    } 
-
-    FILE* f = fopen(test_file, "rb");
-    if(!f)
-    {
-        fprintf(stderr, "ERROR: failed to open filed %s. Reaseon: %s.\n", test_file, strerror(errno));
-        GOTO_FINISH(1);
-    }
-
-    size_t line_len = 80;
-    line = malloc(sizeof(char)*line_len);
-    while(!feof(f))
-    {
-        ssize_t ret = getline(&line, &line_len, f);
-        if(ret == -1 && errno != 0)
-        {
-            fprintf(stderr, "ERROR: failed to read file: %d - %s.\n", errno, strerror(errno));
-            GOTO_FINISH(1);
-        }
-        if(ret != -1)
-        {
-            if(!editor_append_line(&e, line))
-            {
-                fprintf(stderr, "ERROR: failed to load file.\n");
-                GOTO_FINISH(1);
-            }
-        }
-    }
-
-    // close the file
-    if(f)
-    {
-        fclose(f);
-        f = NULL;
-    }
-
-    if(!(e.filepath = malloc(sizeof(char)*strlen(test_file))))
-    {
-        fprintf(stderr, "ERROR: failed to allocate file path.\n");
-        GOTO_FINISH(1);
-    }
-    memcpy(e.filepath, test_file,strlen(test_file));
-
-    // TODO get Terminal size to initialise display size
     if(EXIT_FAILURE == display_init(&d, 20,20))
     {
         fprintf(stderr, "ERROR: failed to allocate display.\n");
@@ -511,48 +482,36 @@ int main_test_insert_in_the_middle_of_a_line()
         fprintf(stderr, "ERROR: caught an error\n");
         GOTO_FINISH(1);
     }
-    //while(e.mode != quit) 
-    {
-        //uncomment to see ascii sequence while typing
-        //if((ret_val=printt_escape_seq()) != 0) GOTO_FINISH(ret_val)
-        //else continue;
 
         editor_viewport.lines = d.lines-2-1;
         editor_viewport.cols = d.cols-2;
-        editor_render(&e, &editor_viewport, &d);
+        editor_render(&tested, &editor_viewport, &d);
 
         message_viewport.y0 = d.lines-1;
         message_viewport.cols = d.cols;
-        editor_message_render(&e, &message_viewport, &d);
+        editor_message_render(&tested, &message_viewport, &d);
 
         e.crsr.line = 1;
-        e.crsr.col = 15;
-        handle_insert_cr(&e, NULL);
+        e.crsr.col = 5;
+        handle_insert_cr(&tested, NULL);
 
-        editor_render(&e, &editor_viewport, &d);
-        editor_message_render(&e, &message_viewport, &d);
-    }
+        editor_render(&tested, &editor_viewport, &d);
+        editor_message_render(&tested, &message_viewport, &d);
+
+        assert(editor_equals(&tested, &expected));
     
 finish:
     fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
     fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
-    //if (terminal_ready) 
-    //{
-    //    // reset treminal 
-    //    printf("\033[2J");
-    //    term.c_lflag |= ECHO;
-    //    term.c_lflag |= ICANON;
-    //    tcsetattr(STDIN_FILENO, 0, &term);
-    //}
     if(line) free(line);
-    editor_free(&e);
+    editor_free(&tested);
+    editor_free(&expected);
     display_free(&d);
-    if(f) fclose(f);
     return ret_val;
 }
 
-int main(int argc, char* argv[])
+int real_main(int argc, char* argv[])
 {
     int ret_val = 0;
     char *line = NULL;
@@ -771,4 +730,10 @@ finish:
     display_free(&d);
     if(f) fclose(f);
     return ret_val;
+}
+
+int main(int argc, char *argv[])
+{
+    return test_insert_in_the_middle_of_a_line();
+    //return real_main(argc, argv);
 }

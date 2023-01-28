@@ -327,29 +327,62 @@ void editor_backspace_at_crsr(Editor *e)
 }
 void editor_delete_at_crsr(Editor *e)
 {
-    editor_delete_at_xy(e, e->crsr.col, e->crsr.line);
-    if(e->crsr.col >= e->lines[e->crsr.line].filled_size-1)
+    if(e->lines[e->crsr.line].filled_size > 0)
     {
-        e->crsr.col = e->lines[e->crsr.line].filled_size-1;
+        editor_delete_at_xy(e, e->crsr.col, e->crsr.line);
+        if(e->crsr.col >= e->lines[e->crsr.line].filled_size-1)
+        {
+            e->crsr.col = e->lines[e->crsr.line].filled_size-1;
+        }
     }
-    //assert(e && e->lines);
-    //if(e->crsr.line>=0 && e->crsr.line < e->total_size)
-    //{
-    //    if(e->lines[e->crsr.line].filled_size > e->crsr.col && e->crsr.col >= 0)
-    //    {
-    //        memmove(&(e->lines[e->crsr.line].content[e->crsr.col]),
-    //                &(e->lines[e->crsr.line].content[e->crsr.col+1]),
-    //                e->lines[e->crsr.line].filled_size - e->crsr.col - 1
-    //        ); 
-    //        e->lines[e->crsr.line].filled_size -= 1;
-    //        e->lines[e->crsr.line].content[e->lines[e->crsr.line].filled_size] = '\0';
-    //        assert(e->lines[e->crsr.line].filled_size >= 0);
-    //        if(e->crsr.col >= e->lines[e->crsr.line].filled_size-1)
-    //        {
-    //            e->crsr.col = e->lines[e->crsr.line].filled_size-1;
-    //        }
-    //    }
-    //}
+    if(e->lines[e->crsr.line].filled_size == 0)
+    {
+        // empty line can be deleted
+        free(e->lines[e->crsr.line].content);
+        // TODO
+        assert(0 && "not yet implemented");
+    }
+}
+
+bool line_equal(const Line *l1, const Line *l2)
+{
+    //bool res = (l1 != NULL) => (l2 != NULL);
+    bool res = !(l1 != NULL) || (l2 != NULL);
+    if(res && l1 && l2)
+    {
+        //res &= l1->total_size == l2->total_size;
+        res &= l1->filled_size == l2->filled_size;
+        res &= (0 == strncmp(l1->content, l2->content, l1->filled_size));
+    }
+    return res;
+}
+
+bool editor_equals(const Editor *e1,const Editor *e2)
+{
+    //bool res = (e1 != NULL) => (e2 != NULL);
+    bool res = !(e1 != NULL) || (e2 != NULL);
+    if(res && e1 && e2)
+    {
+        res &= (0 == strcmp(e1->filepath, e2->filepath));
+        res &= e1->crsr.col == e2->crsr.col && e1->crsr.line == e2->crsr.line;
+        res &= e1->viewportOffset.col == e2->viewportOffset.col && e1->viewportOffset.line == e2->viewportOffset.line;
+        res &= e1->total_size == e2->total_size;
+        res &= e1->mode == e2->mode;
+        res &= e1->message_capacity == e2->message_capacity;
+        res &= e1->message_count == e2->message_count;
+        res &= (0 == strncmp(e1->message, e2->message, e1->message_count));
+        res &= searchfield_equal(e1->search_field, e2->search_field);
+
+        if(res)
+        {
+            for(size_t i=0; res && i < e1->total_size; i++)
+            {
+                res &= line_equal(&(e1->lines[i]), &(e2->lines[i]));
+            }
+        }
+    }
+
+    return res;
 }
 
 #endif
