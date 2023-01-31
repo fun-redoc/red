@@ -57,3 +57,19 @@ you can see and adjust all key bindings in the array ```KeyHandler handler_map[]
 - ```l```: righ
 - ```j```: down
 - ```k```: up
+
+
+## Build, Test etc.
+
+build with ```./build.sh```.
+start with ```./red <file>```.
+
+There are some tests commented out in main(). Maybe later i will implement testmode.
+
+In testmode one can use venguard to check for memory leaks. i use docker container (see ```Dockerfile```).
+
+Build container with
+```docker build --pull --rm -f "Dockerfile" -t red:latest```.
+
+Run Vanguard in docker with
+```docker run --rm -it  red:latest```.

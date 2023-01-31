@@ -22,7 +22,8 @@ int editor_init(Editor* e)
 {
     e->filepath = NULL;
     e->lines = NULL;
-    e->total_size = 0;
+    e->count = 0;
+    e->capacity = 0;
     e->crsr = (Cursor){0,0};
     e->viewportOffset = (Cursor){0,0};
     e->mode = browse;
@@ -56,9 +57,11 @@ void editor_free(Editor *e)
         }
         if(e->lines != NULL)
         {
-            for(int i=0; i<e->total_size; i++)
+            for(int i=0; i<e->capacity; i++)
             {
-                free(e->lines[i].content);
+                assert(!e->lines[i].content || e->lines[i].total_size > 0);
+                assert(e->lines[i].total_size > 0 || !e->lines[i].content);
+                if(e->lines[i].content) free(e->lines[i].content);
                 e->lines[i].content = NULL;
                 e->lines[i].filled_size = 0;
                 e->lines[i].total_size = 0;
@@ -73,33 +76,89 @@ bool editor_append_line(Editor *e, const char *s)
 {
     assert(e && s);
 
-    size_t new_size;
+    size_t new_count;
+    size_t new_capacity;
     if(e->lines == NULL)
     {
-        new_size = 1;
-        e->lines = malloc(sizeof(Line));
+        new_count    = 1;
+        new_capacity = 1;
+        e->lines     = malloc(sizeof(Line));
+        if(e->lines) 
+        {
+            e->lines[new_capacity-1] = (Line){NULL,0,0};
+        }
     }
     else
     {
-        new_size = e->total_size + 1;
-        e->lines = realloc(e->lines, sizeof(Line)*(new_size));
+        new_count = e->count + 1;
+        if(new_count > e->capacity)
+        {
+            new_capacity = e->capacity +1;
+            e->lines = realloc(e->lines, sizeof(Line)*(new_capacity));
+            if(e->lines)
+            {
+                e->lines[new_capacity-1] = (Line){NULL,0,0};
+            }
+        }
     }
     if(e->lines == NULL) return false;
-    e->total_size = new_size;
+    e->capacity = new_capacity;
+    e->count    = new_count;
 
-    size_t l = e->total_size - 1;
+    size_t l = e->count - 1;
     size_t slen = strlen(s);
     if(s[slen-1] == '\n') slen -= 1; // skip new line
-    e->lines[l].total_size = MAX(LINE_INITIAL_SIZE, slen);
-
-    e->lines[l].content = malloc(sizeof(char)*(e->lines[l].total_size));
+    size_t new_total_size = MAX(LINE_INITIAL_SIZE, slen);
+    if(e->lines[l].content == NULL)
+    {
+        assert(e->lines[l].total_size == 0);
+        e->lines[l].content = malloc(sizeof(char)*(new_total_size));
+    }
+    else
+    {
+        assert(e->lines[l].total_size > 0);
+        e->lines[l].content = realloc(e->lines[l].content, sizeof(char)*(new_total_size));
+    }
     if(!e->lines[l].content) return false;
+    e->lines[l].total_size = new_total_size;
 
     memcpy(e->lines[l].content, s, slen);
     e->lines[l].filled_size = slen;
 
     return true;
 }
+
+//bool old_editor_append_line(Editor *e, const char *s)
+//{
+//    assert(e && s);
+//
+//    size_t new_size;
+//    if(e->lines == NULL)
+//    {
+//        new_size = 1;
+//        e->lines = malloc(sizeof(Line));
+//    }
+//    else
+//    {
+//        new_size = e->total_size + 1;
+//        e->lines = realloc(e->lines, sizeof(Line)*(new_size));
+//    }
+//    if(e->lines == NULL) return false;
+//    e->total_size = new_size;
+//
+//    size_t l = e->total_size - 1;
+//    size_t slen = strlen(s);
+//    if(s[slen-1] == '\n') slen -= 1; // skip new line
+//    e->lines[l].total_size = MAX(LINE_INITIAL_SIZE, slen);
+//
+//    e->lines[l].content = malloc(sizeof(char)*(e->lines[l].total_size));
+//    if(!e->lines[l].content) return false;
+//
+//    memcpy(e->lines[l].content, s, slen);
+//    e->lines[l].filled_size = slen;
+//
+//    return true;
+//}
 
 void editor_render(const Editor *e, Viewport *v, Display *disp)
 {
@@ -127,7 +186,7 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     // scroll down
     if(e->crsr.line > v->lines-1)
     {
-        if(e->total_size - v->scrollOffset.lines > v->lines-1)
+        if(e->count - v->scrollOffset.lines > v->lines-1)
         {
             v->scrollOffset.lines +=1;
         }
@@ -148,7 +207,7 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         // clear the line first
         memset(&(disp->viewbuffer[(v->y0 + l)*disp->cols+(v->x0)]), BLANK, v->cols);
 
-        if(el < e->total_size)
+        if(el < e->count)
         {
             size_t dlen = MIN(v->cols, e->lines[el].filled_size <= ec ? 0 : e->lines[el].filled_size - ec);
             if(dlen > 0) 
@@ -251,7 +310,7 @@ void editor_insert(Editor *e, const char *s)
 {
     assert(e);
     assert(s && strlen(s) > 0);
-    if(e->total_size > e->crsr.line)
+    if(e->count > e->crsr.line)
     {
         // edit exising line
         #define cur_line (e->lines[e->crsr.line])
@@ -301,7 +360,7 @@ void editor_insert(Editor *e, const char *s)
 void editor_delete_at_xy(Editor *e, size_t x, size_t y)
 {
     assert(e && e->lines);
-    if(y>=0 && y< e->total_size)
+    if(y>=0 && y< e->count)
     {
         if(e->lines[y].filled_size > x && x >= 0)
         {
@@ -327,6 +386,8 @@ void editor_backspace_at_crsr(Editor *e)
 }
 void editor_delete_at_crsr(Editor *e)
 {
+    if(!e->lines) return;
+    if(e->count <= 0) return;
     if(e->lines[e->crsr.line].filled_size > 0)
     {
         editor_delete_at_xy(e, e->crsr.col, e->crsr.line);
@@ -338,9 +399,16 @@ void editor_delete_at_crsr(Editor *e)
     if(e->lines[e->crsr.line].filled_size == 0)
     {
         // empty line can be deleted
-        free(e->lines[e->crsr.line].content);
-        // TODO
-        assert(0 && "not yet implemented");
+        if(e->lines[e->crsr.line].content) free(e->lines[e->crsr.line].content);
+        // TODO better use memmove instead of loop
+        for(size_t i=e->crsr.line; i<e->count-1;i++)
+        {
+            e->lines[i] = e->lines[i+1];
+        }
+        e->count -= 1;
+        e->lines[e->count].content = NULL;
+        e->lines[e->count].filled_size = 0;
+        e->lines[e->count].total_size = 0;
     }
 }
 
@@ -366,7 +434,8 @@ bool editor_equals(const Editor *e1,const Editor *e2)
         res &= (0 == strcmp(e1->filepath, e2->filepath));
         res &= e1->crsr.col == e2->crsr.col && e1->crsr.line == e2->crsr.line;
         res &= e1->viewportOffset.col == e2->viewportOffset.col && e1->viewportOffset.line == e2->viewportOffset.line;
-        res &= e1->total_size == e2->total_size;
+        res &= e1->count == e2->count;
+        //res &= e1->capacity == e2->capacity;
         res &= e1->mode == e2->mode;
         res &= e1->message_capacity == e2->message_capacity;
         res &= e1->message_count == e2->message_count;
@@ -375,7 +444,7 @@ bool editor_equals(const Editor *e1,const Editor *e2)
 
         if(res)
         {
-            for(size_t i=0; res && i < e1->total_size; i++)
+            for(size_t i=0; res && i < e1->count; i++)
             {
                 res &= line_equal(&(e1->lines[i]), &(e2->lines[i]));
             }

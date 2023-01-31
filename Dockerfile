@@ -27,7 +27,7 @@ RUN rm -Rf red.dSYM
 # Use Clang to compile the Test.cpp source file
 #RUN clang search_field.c display.c editor.c main.c -g -O0 -o red 
 # Use GCC to compile the Test.cpp source file
-RUN gcc search_field.c display.c editor.c main.c -g -g3 -ggdb -O0 -o red 
+RUN gcc search_field.c display.c editor.c main.c -DUNIT_TEST -g -g3 -ggdb -O0 -o red-unit
 
 
 # check for licks
@@ -36,4 +36,4 @@ RUN gcc search_field.c display.c editor.c main.c -g -g3 -ggdb -O0 -o red
 # Run the output program from the previous step
 #CMD ["ls", "-a"]
 #CMD ["./red", "test.txt"]
-CMD [ "valgrind", "-s", "--tool=memcheck", "--leak-check=yes", "--show-reachable=yes", "--num-callers=20", "--track-fds=yes", "--track-origins=yes", "./red", "test.txt"]
+CMD [ "valgrind", "-s", "--tool=memcheck", "--leak-check=yes", "--show-reachable=yes", "--num-callers=20", "--track-fds=yes", "--track-origins=yes", "./red-unit"]

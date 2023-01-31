@@ -1,5 +1,4 @@
 // WORKING ON:
-// delete empty line
 // backspace at crsr.col = 0 (append to prev line)
 // delete not empty line
 
@@ -22,6 +21,8 @@
 // move cursor in insert mode (emacs commands, arrow keys)
 
 // READY
+// commandline for unit test mode or better another destination
+// delete empty line
 // append line  implement     {insert, "\x0a", handle_insert_cr},
 // insert mode: backspace
 // insert mode: delete
@@ -191,7 +192,7 @@ void handle_go_left(Editor *e, const char* s)
 }
 void handle_go_down(Editor *e, const char* s)
 {
-    if(e->crsr.line < e->total_size-1)
+    if(e->crsr.line < e->count-1)
     {
         e->crsr.line += 1;
     }
@@ -277,7 +278,7 @@ void handle_leave_insert_mode(Editor *e, const char *s)
 
 void handle_browse_cr(Editor *e, const char *s)
 {
-    if(e->crsr.line+1 < e->total_size)
+    if(e->crsr.line+1 < e->count)
     {
         e->crsr.line += 1;
         e->crsr.col = 0;
@@ -292,11 +293,20 @@ void handle_insert_cr(Editor *e, const char *s)
     if(l->filled_size < e->crsr.col) return;
     size_t len = l->filled_size - e->crsr.col;
     size_t next_line = e->crsr.line + 1;
-    if(next_line <= e->total_size)
+    // TODO 
+    // 1. count and capacity 
+    // 2. move code to editor.c using a smart function name
+    if(next_line <= e->count)
     {
         // insert line
-        size_t new_size = e->total_size + 1;
-        e->lines = realloc(e->lines, sizeof(Line)*(new_size));
+        size_t needed_capacity = e->count + 1;
+        if(needed_capacity > e->capacity)
+        {
+            e->lines = realloc(e->lines, sizeof(Line)*(needed_capacity));
+            if(!e->lines) return;
+            e->capacity = needed_capacity;
+        }
+        size_t new_size = e->count + 1;
         // TODO think on using memmove
         /*
         1aaaaa (crsr.col = 2 crsr.line = 1)
@@ -337,8 +347,7 @@ void handle_insert_cr(Editor *e, const char *s)
             L1:total_size = 11
             l1:filled_size = old filled_size - len = 9 - 5=4
         */
-
-        e->total_size = new_size;
+        e->count = new_size;
         e->crsr.line += 1;
         e->crsr.col = 0;
     }
@@ -371,7 +380,7 @@ void handle_save(Editor *e, const char *s)
         fprintf(stderr, "ERROR: failed to open file %s for writing errno=%d (%s).\n", e->filepath, errno, strerror(errno));
         longjmp(try, EXIT_FAILURE);
     }
-    for(size_t i=0; i < e->total_size; i++)
+    for(size_t i=0; i < e->count; i++)
     {
         if(EOF == fputs(e->lines[i].content, f))
         {
@@ -422,19 +431,281 @@ KeyHandler handler_map[] = {
     {search, "\x1b\x5b\x43", handle_right_search_mode},
 };
 
+int test_delete_line_if_empty_1()
+{
+    // TEST
+    int ret_val = 0;
+    char *line = NULL;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1);
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    (Cursor){0,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&tested, "");
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    {0,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+
+    if(EXIT_FAILURE == display_init(&d, 20,20))
+    {
+        fprintf(stderr, "ERROR: failed to allocate display.\n");
+        GOTO_FINISH(1);     
+    } 
+
+    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
+    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+
+    // using lonjump to be able to handle exceptions from resize handler appropriatelly
+    // kind of try-catch with no syntactic sugar
+    int catch_exception = setjmp(try);
+    if(catch_exception==EXIT_FAILURE)
+    {
+        fprintf(stderr, "ERROR: caught an error\n");
+        GOTO_FINISH(1);
+    }
+
+        editor_viewport.lines = d.lines-2-1;
+        editor_viewport.cols = d.cols-2;
+        editor_render(&tested, &editor_viewport, &d);
+
+        message_viewport.y0 = d.lines-1;
+        message_viewport.cols = d.cols;
+        editor_message_render(&tested, &message_viewport, &d);
+
+        e.crsr.line = 1;
+        e.crsr.col = 5;
+        handle_delete_insert_mode(&tested, NULL);
+
+        editor_render(&tested, &editor_viewport, &d);
+        editor_message_render(&tested, &message_viewport, &d);
+
+        assert(editor_equals(&tested, &expected));
+    
+finish:
+    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
+    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+    if(line) free(line);
+    editor_free(&tested);
+    editor_free(&expected);
+    display_free(&d);
+    return ret_val;
+}
+
+
+int test_delete_line_if_empty()
+{
+    // TEST
+    int ret_val = 0;
+    char *line = NULL;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1);
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    (Cursor){0,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    {0,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+
+    if(EXIT_FAILURE == display_init(&d, 20,20))
+    {
+        fprintf(stderr, "ERROR: failed to allocate display.\n");
+        GOTO_FINISH(1);     
+    } 
+
+    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
+    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+
+    // using lonjump to be able to handle exceptions from resize handler appropriatelly
+    // kind of try-catch with no syntactic sugar
+    int catch_exception = setjmp(try);
+    if(catch_exception==EXIT_FAILURE)
+    {
+        fprintf(stderr, "ERROR: caught an error\n");
+        GOTO_FINISH(1);
+    }
+
+        editor_viewport.lines = d.lines-2-1;
+        editor_viewport.cols = d.cols-2;
+        editor_render(&tested, &editor_viewport, &d);
+
+        message_viewport.y0 = d.lines-1;
+        message_viewport.cols = d.cols;
+        editor_message_render(&tested, &message_viewport, &d);
+
+        e.crsr.line = 1;
+        e.crsr.col = 5;
+        handle_delete_insert_mode(&tested, NULL);
+
+        editor_render(&tested, &editor_viewport, &d);
+        editor_message_render(&tested, &message_viewport, &d);
+
+        assert(editor_equals(&tested, &expected));
+    
+finish:
+    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
+    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+    if(line) free(line);
+    editor_free(&tested);
+    editor_free(&expected);
+    display_free(&d);
+    return ret_val;
+}
+
+
+int test_delete_empty_line()
+{
+    // TEST
+    int ret_val = 0;
+    char *line = NULL;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1);
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    (Cursor){1,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&tested, "1.123456789");
+    editor_append_line(&tested, "");
+    editor_append_line(&tested, "3.123456789");
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    {1,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&expected, "1.123456789");
+    editor_append_line(&expected, "3.123456789");
+
+    if(EXIT_FAILURE == display_init(&d, 20,20))
+    {
+        fprintf(stderr, "ERROR: failed to allocate display.\n");
+        GOTO_FINISH(1);     
+    } 
+
+    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
+    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
+
+    // using lonjump to be able to handle exceptions from resize handler appropriatelly
+    // kind of try-catch with no syntactic sugar
+    int catch_exception = setjmp(try);
+    if(catch_exception==EXIT_FAILURE)
+    {
+        fprintf(stderr, "ERROR: caught an error\n");
+        GOTO_FINISH(1);
+    }
+
+        editor_viewport.lines = d.lines-2-1;
+        editor_viewport.cols = d.cols-2;
+        editor_render(&tested, &editor_viewport, &d);
+
+        message_viewport.y0 = d.lines-1;
+        message_viewport.cols = d.cols;
+        editor_message_render(&tested, &message_viewport, &d);
+
+        e.crsr.line = 1;
+        e.crsr.col = 5;
+        handle_delete_insert_mode(&tested, NULL);
+
+        editor_render(&tested, &editor_viewport, &d);
+        editor_message_render(&tested, &message_viewport, &d);
+
+        assert(editor_equals(&tested, &expected));
+    
+finish:
+    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
+    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+    if(line) free(line);
+    editor_free(&tested);
+    editor_free(&expected);
+    display_free(&d);
+    return ret_val;
+}
+
+
 int test_insert_in_the_middle_of_a_line()
 {
     // TEST
     int ret_val = 0;
     char *line = NULL;
     const char * test_file = "test.txt";
-    char *fname = malloc(strlen(test_file));
-    char *fname1 = malloc(strlen(test_file));
+    char *fname = malloc(strlen(test_file)+1); // one for terminating \0
+    char *fname1 = malloc(strlen(test_file)+1);
 
     Editor tested = {
     strcpy(fname, test_file),
     insert,
     NULL,
+    0,
     0,
     {1,6},
     {0,0},
@@ -451,6 +722,7 @@ int test_insert_in_the_middle_of_a_line()
     strcpy(fname1, test_file),
     insert,
     NULL,
+    0,
     0,
     {2,0},
     {0,0},
@@ -732,8 +1004,19 @@ finish:
     return ret_val;
 }
 
-int main(int argc, char *argv[])
-{
-    return test_insert_in_the_middle_of_a_line();
-    //return real_main(argc, argv);
-}
+#ifdef UNIT_TEST
+    int main(int argc, char *argv[])
+    {
+        int res = 0;
+        res |= test_insert_in_the_middle_of_a_line();
+        res |= test_delete_empty_line();
+        res |= test_delete_line_if_empty();
+        res |= test_delete_line_if_empty_1();
+        return res;
+    }
+#else
+    int main(int argc, char *argv[])
+    {
+        return real_main(argc, argv);
+    }
+#endif
