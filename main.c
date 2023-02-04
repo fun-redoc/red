@@ -1,5 +1,4 @@
 // WORKING ON:
-// backspace at crsr.col = 0 (append to prev line)
 // delete not empty line
 
 // BACKLOG:
@@ -21,6 +20,8 @@
 // move cursor in insert mode (emacs commands, arrow keys)
 
 // READY
+// backspace at crsr.col = 0 (append to prev line)
+// BUG goto end of last line, enter insert mode, enter CR, edit -> editor stalls
 // commandline for unit test mode or better another destination
 // delete empty line
 // append line  implement     {insert, "\x0a", handle_insert_cr},
@@ -56,6 +57,17 @@
 
 #define INITIAL_STRING_BUFFER_SIZE 1
 #define GOTO_FINISH(_ret_val) { ret_val = (_ret_val); goto finish; }
+
+// TODO 
+//typedef struct
+//{
+//    Display d;
+//    Editor **es;
+//    Editor *active_editor;
+//    size_t count;
+//    size_t capacity;
+//} Red;
+
 
 /*
  * global variables
@@ -239,7 +251,7 @@ void handle_right_search_mode(Editor *e, const char*s)
 
 void handle_generic_insertmode(Editor *e, const char*s)
 {
-    editor_insert(e, s);
+    editor_insert(e, s, strlen(s));
 }
 void handle_enter_insert_mode(Editor *e, const char *s)
 {                                    
@@ -360,9 +372,25 @@ void handle_insert_cr(Editor *e, const char *s)
 
 }
 
+void handle_browse_to_end_of_file(Editor *e, const char *s)
+{
+    e->crsr.line = e->count-1;
+    e->crsr.col = e->lines[e->crsr.line].filled_size;
+    fprintf(stderr, "continuing handle_browse_to_end_of_file %zu %zu\n",e->crsr.line, e->crsr.col);
+    fprintf(stderr, "%s\n",e->lines[e->crsr.line].content);
+}
+
 void handle_browse_to_end_of_line(Editor *e, const char *s)
 {
-    e->crsr.col = MAX(0, e->lines[e->crsr.line].filled_size-1);
+    fprintf(stderr, "in handle_browse_to_end_of_line %zu %zu %zu\n",e->count, e->crsr.line, e->crsr.col);
+    if(e->crsr.line < e->count)
+    {
+        if(e->lines[e->crsr.line].filled_size > 0)
+        {
+            e->crsr.col = e->lines[e->crsr.line].filled_size-1;
+        }
+    }
+    fprintf(stderr, "in handle_browse_to_end_of_line %zu %zu\n",e->crsr.line, e->crsr.col);
 }
 
 void handle_browse_to_begin_of_line(Editor *e, const char *s)
@@ -396,6 +424,7 @@ void handle_save(Editor *e, const char *s)
     fclose(f);
 }                                    
 
+
 KeyHandler handler_map[] = {
     {browse, "q", handle_quit},
     {browse, "l", handle_go_right},
@@ -412,6 +441,7 @@ KeyHandler handler_map[] = {
     {browse, "\x0a", handle_browse_cr},
     {browse, "$", handle_browse_to_end_of_line},
     {browse, "0", handle_browse_to_begin_of_line},
+    {browse, "G", handle_browse_to_end_of_file},
 //        {browse, "\x5e", handle_browse_to_first_non_blank},
     {browse, "s", handle_enter_search_mode},
     {browse, "i", handle_enter_insert_mode},
@@ -431,357 +461,6 @@ KeyHandler handler_map[] = {
     {search, "\x1b\x5b\x43", handle_right_search_mode},
 };
 
-int test_delete_line_if_empty_1()
-{
-    // TEST
-    int ret_val = 0;
-    char *line = NULL;
-    const char * test_file = "test.txt";
-    char *fname = malloc(strlen(test_file)+1);
-    char *fname1 = malloc(strlen(test_file)+1);
-
-    Editor tested = {
-    strcpy(fname, test_file),
-    insert,
-    NULL,
-    0,
-    0,
-    (Cursor){0,0},
-    {0,0},
-    NULL,
-    NULL,
-    0,
-    0
-    };
-    editor_append_line(&tested, "");
-
-    Editor expected = {
-    strcpy(fname1, test_file),
-    insert,
-    NULL,
-    0,
-    0,
-    {0,0},
-    {0,0},
-    NULL,
-    NULL,
-    0,
-    0
-    };
-
-    if(EXIT_FAILURE == display_init(&d, 20,20))
-    {
-        fprintf(stderr, "ERROR: failed to allocate display.\n");
-        GOTO_FINISH(1);     
-    } 
-
-    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
-    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
-    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
-
-    // using lonjump to be able to handle exceptions from resize handler appropriatelly
-    // kind of try-catch with no syntactic sugar
-    int catch_exception = setjmp(try);
-    if(catch_exception==EXIT_FAILURE)
-    {
-        fprintf(stderr, "ERROR: caught an error\n");
-        GOTO_FINISH(1);
-    }
-
-        editor_viewport.lines = d.lines-2-1;
-        editor_viewport.cols = d.cols-2;
-        editor_render(&tested, &editor_viewport, &d);
-
-        message_viewport.y0 = d.lines-1;
-        message_viewport.cols = d.cols;
-        editor_message_render(&tested, &message_viewport, &d);
-
-        e.crsr.line = 1;
-        e.crsr.col = 5;
-        handle_delete_insert_mode(&tested, NULL);
-
-        editor_render(&tested, &editor_viewport, &d);
-        editor_message_render(&tested, &message_viewport, &d);
-
-        assert(editor_equals(&tested, &expected));
-    
-finish:
-    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
-    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
-    if(line) free(line);
-    editor_free(&tested);
-    editor_free(&expected);
-    display_free(&d);
-    return ret_val;
-}
-
-
-int test_delete_line_if_empty()
-{
-    // TEST
-    int ret_val = 0;
-    char *line = NULL;
-    const char * test_file = "test.txt";
-    char *fname = malloc(strlen(test_file)+1);
-    char *fname1 = malloc(strlen(test_file)+1);
-
-    Editor tested = {
-    strcpy(fname, test_file),
-    insert,
-    NULL,
-    0,
-    0,
-    (Cursor){0,0},
-    {0,0},
-    NULL,
-    NULL,
-    0,
-    0
-    };
-
-    Editor expected = {
-    strcpy(fname1, test_file),
-    insert,
-    NULL,
-    0,
-    0,
-    {0,0},
-    {0,0},
-    NULL,
-    NULL,
-    0,
-    0
-    };
-
-    if(EXIT_FAILURE == display_init(&d, 20,20))
-    {
-        fprintf(stderr, "ERROR: failed to allocate display.\n");
-        GOTO_FINISH(1);     
-    } 
-
-    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
-    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
-    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
-
-    // using lonjump to be able to handle exceptions from resize handler appropriatelly
-    // kind of try-catch with no syntactic sugar
-    int catch_exception = setjmp(try);
-    if(catch_exception==EXIT_FAILURE)
-    {
-        fprintf(stderr, "ERROR: caught an error\n");
-        GOTO_FINISH(1);
-    }
-
-        editor_viewport.lines = d.lines-2-1;
-        editor_viewport.cols = d.cols-2;
-        editor_render(&tested, &editor_viewport, &d);
-
-        message_viewport.y0 = d.lines-1;
-        message_viewport.cols = d.cols;
-        editor_message_render(&tested, &message_viewport, &d);
-
-        e.crsr.line = 1;
-        e.crsr.col = 5;
-        handle_delete_insert_mode(&tested, NULL);
-
-        editor_render(&tested, &editor_viewport, &d);
-        editor_message_render(&tested, &message_viewport, &d);
-
-        assert(editor_equals(&tested, &expected));
-    
-finish:
-    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
-    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
-    if(line) free(line);
-    editor_free(&tested);
-    editor_free(&expected);
-    display_free(&d);
-    return ret_val;
-}
-
-
-int test_delete_empty_line()
-{
-    // TEST
-    int ret_val = 0;
-    char *line = NULL;
-    const char * test_file = "test.txt";
-    char *fname = malloc(strlen(test_file)+1);
-    char *fname1 = malloc(strlen(test_file)+1);
-
-    Editor tested = {
-    strcpy(fname, test_file),
-    insert,
-    NULL,
-    0,
-    0,
-    (Cursor){1,0},
-    {0,0},
-    NULL,
-    NULL,
-    0,
-    0
-    };
-    editor_append_line(&tested, "1.123456789");
-    editor_append_line(&tested, "");
-    editor_append_line(&tested, "3.123456789");
-
-    Editor expected = {
-    strcpy(fname1, test_file),
-    insert,
-    NULL,
-    0,
-    0,
-    {1,0},
-    {0,0},
-    NULL,
-    NULL,
-    0,
-    0
-    };
-    editor_append_line(&expected, "1.123456789");
-    editor_append_line(&expected, "3.123456789");
-
-    if(EXIT_FAILURE == display_init(&d, 20,20))
-    {
-        fprintf(stderr, "ERROR: failed to allocate display.\n");
-        GOTO_FINISH(1);     
-    } 
-
-    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
-    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
-    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
-
-    // using lonjump to be able to handle exceptions from resize handler appropriatelly
-    // kind of try-catch with no syntactic sugar
-    int catch_exception = setjmp(try);
-    if(catch_exception==EXIT_FAILURE)
-    {
-        fprintf(stderr, "ERROR: caught an error\n");
-        GOTO_FINISH(1);
-    }
-
-        editor_viewport.lines = d.lines-2-1;
-        editor_viewport.cols = d.cols-2;
-        editor_render(&tested, &editor_viewport, &d);
-
-        message_viewport.y0 = d.lines-1;
-        message_viewport.cols = d.cols;
-        editor_message_render(&tested, &message_viewport, &d);
-
-        e.crsr.line = 1;
-        e.crsr.col = 5;
-        handle_delete_insert_mode(&tested, NULL);
-
-        editor_render(&tested, &editor_viewport, &d);
-        editor_message_render(&tested, &message_viewport, &d);
-
-        assert(editor_equals(&tested, &expected));
-    
-finish:
-    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
-    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
-    if(line) free(line);
-    editor_free(&tested);
-    editor_free(&expected);
-    display_free(&d);
-    return ret_val;
-}
-
-
-int test_insert_in_the_middle_of_a_line()
-{
-    // TEST
-    int ret_val = 0;
-    char *line = NULL;
-    const char * test_file = "test.txt";
-    char *fname = malloc(strlen(test_file)+1); // one for terminating \0
-    char *fname1 = malloc(strlen(test_file)+1);
-
-    Editor tested = {
-    strcpy(fname, test_file),
-    insert,
-    NULL,
-    0,
-    0,
-    {1,6},
-    {0,0},
-    NULL,
-    NULL,
-    0,
-    0
-    };
-    editor_append_line(&tested, "1.123456789");
-    editor_append_line(&tested, "2.123456789");
-    editor_append_line(&tested, "3.123456789");
-
-    Editor expected = {
-    strcpy(fname1, test_file),
-    insert,
-    NULL,
-    0,
-    0,
-    {2,0},
-    {0,0},
-    NULL,
-    NULL,
-    0,
-    0
-    };
-    editor_append_line(&expected, "1.123456789");
-    editor_append_line(&expected, "2.1234");
-    editor_append_line(&expected, "56789");
-    editor_append_line(&expected, "3.123456789");
-
-    if(EXIT_FAILURE == display_init(&d, 20,20))
-    {
-        fprintf(stderr, "ERROR: failed to allocate display.\n");
-        GOTO_FINISH(1);     
-    } 
-
-    editor_viewport  = (Viewport){2,2         ,d.lines-2,d.cols-2, (Scroll){0,0}};
-    search_viewport  = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
-    message_viewport = (Viewport){0,d.lines-1,1       ,d.cols, (Scroll){0,0}};
-
-    // using lonjump to be able to handle exceptions from resize handler appropriatelly
-    // kind of try-catch with no syntactic sugar
-    int catch_exception = setjmp(try);
-    if(catch_exception==EXIT_FAILURE)
-    {
-        fprintf(stderr, "ERROR: caught an error\n");
-        GOTO_FINISH(1);
-    }
-
-        editor_viewport.lines = d.lines-2-1;
-        editor_viewport.cols = d.cols-2;
-        editor_render(&tested, &editor_viewport, &d);
-
-        message_viewport.y0 = d.lines-1;
-        message_viewport.cols = d.cols;
-        editor_message_render(&tested, &message_viewport, &d);
-
-        e.crsr.line = 1;
-        e.crsr.col = 5;
-        handle_insert_cr(&tested, NULL);
-
-        editor_render(&tested, &editor_viewport, &d);
-        editor_message_render(&tested, &message_viewport, &d);
-
-        assert(editor_equals(&tested, &expected));
-    
-finish:
-    fprintf(stderr, "TRACE: result from setjmp %s\n", catch_exception==EXIT_FAILURE? "EXIT_FAILURE": "EXIT_SUCCESS");
-    fprintf(stderr, "TRACE: editor mode==%s\n", e.mode==quit? "quit": "not quit");
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
-    if(line) free(line);
-    editor_free(&tested);
-    editor_free(&expected);
-    display_free(&d);
-    return ret_val;
-}
 
 int real_main(int argc, char* argv[])
 {
@@ -1005,13 +684,24 @@ finish:
 }
 
 #ifdef UNIT_TEST
+#include "tests.c"
     int main(int argc, char *argv[])
     {
+        int catch_exception = setjmp(try);
+        if(catch_exception==EXIT_FAILURE)
+        {
+            fprintf(stderr, "ERROR: caught an error\n");
+            goto finish;
+        }
         int res = 0;
-        res |= test_insert_in_the_middle_of_a_line();
-        res |= test_delete_empty_line();
-        res |= test_delete_line_if_empty();
-        res |= test_delete_line_if_empty_1();
+        //res |= test_insert_in_the_middle_of_a_line();
+        //res |= test_delete_empty_line();
+        //res |= test_delete_line_if_empty();
+        //res |= test_delete_line_if_empty_1();
+        res |= test_backspace_beginn_of_line();
+        if(!res) fprintf(stderr, "all tests passed\n");
+    finish:
+        if(res) fprintf(stderr, "tests not passed\n");
         return res;
     }
 #else

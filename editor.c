@@ -162,11 +162,14 @@ bool editor_append_line(Editor *e, const char *s)
 
 void editor_render(const Editor *e, Viewport *v, Display *disp)
 {
+    fprintf(stderr, "entering editor_render\n");
     assert(e!=NULL && disp!=NULL && v!=NULL);
     // viewport has to fit into Display
     if(!(v->x0 + v->cols <= disp->cols)) return;
     if(!(v->y0 + v->lines <= disp->lines)) return;
     
+    fprintf(stderr, "continuing editor_render crsr.col=%zu\n", e->crsr.col);
+
     // prepare cursors
     // TODO maybe vieportOffset (scolling offset) ist better located in Display instead of Editor
     //scroll to the right if necessary
@@ -174,7 +177,8 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     {
         if(v->scrollOffset.cols + v->cols <= e->lines[e->crsr.line].filled_size)
         {
-            v->scrollOffset.cols += 1;
+            v->scrollOffset.cols = e->crsr.col  - v->cols;
+            //v->scrollOffset.cols += 1;
         }
     }
     //scroll to the left if necessary
@@ -186,14 +190,17 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     // scroll down
     if(e->crsr.line > v->lines-1)
     {
-        if(e->count - v->scrollOffset.lines > v->lines-1)
+        if(e->count - v->scrollOffset.lines >= v->lines-1)
         {
-            v->scrollOffset.lines +=1;
+            fprintf(stderr, "continuing editor_render - scroll down\n");
+            v->scrollOffset.lines = e->crsr.line - v->lines +1;
+            //v->scrollOffset.lines +=1;
         }
     }
     // scroll up
     if(e->crsr.line < v->scrollOffset.lines)
     {
+        fprintf(stderr, "continuing editor_render - scroll up\n");
         v->scrollOffset.lines =e->crsr.line;
     }
 
@@ -214,7 +221,6 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
                 memcpy(&(disp->viewbuffer[(v->y0 + l)*disp->cols+ (v->x0)]), &(e->lines[el].content[ec]), dlen);
             if(dlen == 0) 
                 disp->viewbuffer[(v->y0 + l)*disp->cols + (v->x0)] = SCROLLED_OUT_OF_SIGHT;
-
         }
         else
         {
@@ -226,9 +232,11 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     } 
 
     // set cursor in scroll
+    fprintf(stderr, "before crsr.line=%zu, crsr.col=%zu\n", e->crsr.line, e->crsr.col);
     int crsr_col = e->crsr.col - v->scrollOffset.cols; // can get negative?
     disp->crsr.col  = v->x0 + MAX(0,crsr_col);
     disp->crsr.line = e->crsr.line - v->scrollOffset.lines +v->y0;
+    fprintf(stderr, "after crsr.line=%zu, crsr.col=%zu\n", e->crsr.line, e->crsr.col);
 }
 
 void editor_set_message(Editor *e, const char *s)
@@ -306,34 +314,41 @@ void editor_message_render(const Editor *e, const Viewport *v, Display *d)
     }
 }
 
-void editor_insert(Editor *e, const char *s)
+void editor_insert(Editor *e, const char *s, size_t len)
 {
     assert(e);
-    assert(s && strlen(s) > 0);
+    assert(s && strlen(s) >= len && len > 0);
+    fprintf(stderr, "hier 1\n");
     if(e->count > e->crsr.line)
     {
+        fprintf(stderr, "hier 2\n");
         // edit exising line
         #define cur_line (e->lines[e->crsr.line])
-        size_t needed_capcacity = strlen(s) + cur_line.filled_size;
+        //size_t needed_capcacity = strlen(s) + cur_line.filled_size;
+        size_t needed_capcacity = len + cur_line.filled_size;
         if(needed_capcacity < cur_line.total_size)
         {
+            fprintf(stderr, "hier 3\n");
             
             // entry fits current allocated cur_line.space
             assert(e->crsr.col+1 < cur_line.total_size);
             size_t n = cur_line.filled_size - e->crsr.col;
-            memcpy(&(cur_line.content[e->crsr.col+strlen(s)]), &(cur_line.content[e->crsr.col]),n);
-            memcpy(&(cur_line.content[e->crsr.col]), s, strlen(s));
-            e->crsr.col += strlen(s);
-            cur_line.filled_size += strlen(s);
+            //jmemcpy(&(cur_line.content[e->crsr.col+strlen(s)]), &(cur_line.content[e->crsr.col]),n);
+            memcpy(&(cur_line.content[e->crsr.col+len]), &(cur_line.content[e->crsr.col]),n);
+            //memcpy(&(cur_line.content[e->crsr.col]), s, strlen(s));
+            memcpy(&(cur_line.content[e->crsr.col]), s, len);
+            //e->crsr.col += strlen(s);
+            e->crsr.col += len;
+            //cur_line.filled_size += strlen(s);
+            cur_line.filled_size += len;
         }
         else
         {
-            
-            
-            
-            size_t new_total_size = cur_line.total_size * LINE_GROTH_FACTOR;
+            fprintf(stderr, "hier 4\n");
+            size_t new_total_size = MAX(1, cur_line.total_size * LINE_GROTH_FACTOR);
             while(new_total_size < needed_capcacity) new_total_size *= LINE_GROTH_FACTOR; 
             
+            fprintf(stderr, "hier 5\n");
             cur_line.content = realloc(cur_line.content, sizeof(char)*new_total_size);
             if(!cur_line.content)
             {
@@ -344,10 +359,14 @@ void editor_insert(Editor *e, const char *s)
             
             size_t n = cur_line.filled_size - e->crsr.col;
             
-            memcpy(&(cur_line.content[e->crsr.col+strlen(s)]), &(cur_line.content[e->crsr.col]),n);
-            memcpy(&(cur_line.content[e->crsr.col]), s, strlen(s));
-            e->crsr.col += strlen(s);
-            cur_line.filled_size += strlen(s);
+            //memcpy(&(cur_line.content[e->crsr.col+strlen(s)]), &(cur_line.content[e->crsr.col]),n);
+            memcpy(&(cur_line.content[e->crsr.col+len]), &(cur_line.content[e->crsr.col]),n);
+            //memcpy(&(cur_line.content[e->crsr.col]), s, strlen(s));
+            memcpy(&(cur_line.content[e->crsr.col]), s, len);
+            //e->crsr.col += strlen(s);
+            e->crsr.col += len;
+            //cur_line.filled_size += strlen(s);
+            cur_line.filled_size += len;
         }
     }
     else
@@ -375,13 +394,40 @@ void editor_delete_at_xy(Editor *e, size_t x, size_t y)
     }
 }
 
-
 void editor_backspace_at_crsr(Editor *e)
 {
-    editor_delete_at_xy(e, e->crsr.col-1, e->crsr.line);
-    if(e->crsr.col > 0)
+    if(e->crsr.col == 0)
     {
-        e->crsr.col -= 1;
+       if(e->crsr.line > 0)
+       {
+            size_t old_line_no = e->crsr.line;
+            size_t old_col_no = e->crsr.col;
+            e->crsr.line -= 1;
+            e->crsr.col = e->lines[e->crsr.line].filled_size;
+            size_t new_col_no = e->lines[e->crsr.line].filled_size;
+            editor_insert(e, e->lines[old_line_no].content, e->lines[old_line_no].filled_size);
+            e->crsr.col = new_col_no;
+            free(e->lines[old_line_no].content);
+            e->lines[old_line_no].content = NULL;
+            e->lines[old_line_no].filled_size = 0;
+            e->lines[old_line_no].total_size = 0;
+            for(size_t l=old_line_no; l<e->count-1;l++)
+            {
+                e->lines[l] = e->lines[l+1];
+            }
+            e->lines[e->count-1].content = NULL;
+            e->lines[e->count-1].filled_size = 0;
+            e->lines[e->count-1].total_size = 0;
+            e->count -= 1;
+       }
+    }
+    else if(e->crsr.col > 0)
+    {
+        editor_delete_at_xy(e, e->crsr.col-1, e->crsr.line);
+        if(e->crsr.col > 0) // necessary because maybe side effect in delete_at fn.
+        {
+            e->crsr.col -= 1;
+        }
     }
 }
 void editor_delete_at_crsr(Editor *e)
