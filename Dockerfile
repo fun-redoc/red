@@ -26,7 +26,7 @@ RUN rm -f red-unit
 RUN rm -Rf red.dSYM
 
 # Use Clang to compile the Test.cpp source file
-RUN clang search_field.c display.c editor.c main.c -DUNIT_TEST -g -O0
+RUN clang search_field.c display.c editor.c handler.c main.c -DUNIT_TEST -g -O0
 # Use GCC to compile the Test.cpp source file
 #RUN gcc search_field.c display.c editor.c main.c -DUNIT_TEST -g -ggdb -O0
 

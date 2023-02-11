@@ -113,6 +113,7 @@ bool editor_append_line(Editor *e, const char *s)
     {
         assert(e->lines[l].total_size == 0);
         e->lines[l].content = malloc(sizeof(char)*(new_total_size));
+        memset(e->lines[l].content, '\0', new_total_size);
     }
     else
     {
@@ -317,7 +318,7 @@ void editor_message_render(const Editor *e, const Viewport *v, Display *d)
 void editor_insert(Editor *e, const char *s, size_t len)
 {
     assert(e);
-    assert(s && strlen(s) >= len && len > 0);
+    assert(s != NULL && len > 0 && strnlen(s, len) > 0);
     fprintf(stderr, "hier 1\n");
     if(e->count > e->crsr.line)
     {
@@ -371,8 +372,14 @@ void editor_insert(Editor *e, const char *s, size_t len)
     }
     else
     {
+        for(size_t i=e->count; i<=e->crsr.line-1; i++)
+        {
+            editor_append_line(e, "");
+        }
+        editor_append_line(e, s);
+        e->crsr.col = 0;
         // TODO append line
-        assert(0 && "not yetz implemented");
+        //assert(0 && "not yetz implemented");
     }
 }
 
@@ -429,6 +436,24 @@ void editor_backspace_at_crsr(Editor *e)
             e->crsr.col -= 1;
         }
     }
+}
+void editor_delete_line_at_crsr(Editor *e)
+{
+    if(!e->lines) return;
+    if(e->count <= 0) return;
+
+    if(e->lines[e->crsr.line].total_size > 0 && e->lines[e->crsr.line].content)
+    {
+        free(e->lines[e->crsr.line].content);
+    }
+    for(size_t i=e->crsr.line; i<e->count-1; i++)
+    {
+        e->lines[i] = e->lines[i+1];
+    }
+    e->lines[e->count-1].content = NULL;
+    if(e->count > 0)     e->count -= 1;
+    if(e->crsr.line > 0) e->crsr.line -= 1;
+    e->crsr.col = 0;
 }
 void editor_delete_at_crsr(Editor *e)
 {

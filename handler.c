@@ -31,6 +31,8 @@ void rerender_all(      Display *d,
 
     switch(e->mode)
     {
+        case quit:
+            break;
         case browse:
         {
             // adjust viewport after resize
@@ -194,6 +196,10 @@ void handle_delete_browse_mode(Editor *e, const char *s)
 {
     editor_delete_at_crsr(e);
 }
+void handle_delete_line_browse_mode(Editor *e, const char *s)
+{
+    editor_delete_line_at_crsr(e);
+}
 void handle_delete_insert_mode(Editor *e, const char *s)
 {
     editor_delete_at_crsr(e);
@@ -344,3 +350,13 @@ void handle_save(Editor *e, const char *s)
     }
     fclose(f);
 }                                    
+
+void handle_goto_line(Editor *e, int l)
+{
+    fprintf(stderr, "handle_goto_line %d \n", l);
+    if(l > 0)
+    {
+        fprintf(stderr, "handle_goto_line 01\n");
+        e->crsr.line = MIN(l - 1, e->count-1);
+    }
+}

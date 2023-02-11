@@ -59,6 +59,7 @@ void handle_right_insert_mode(Editor *e, const char *s);
 void handle_backspace_browse_mode(Editor *e, const char *s);
 void handle_backspace_insert_mode(Editor *e, const char *s);
 void handle_delete_browse_mode(Editor *e, const char *s);
+void handle_delete_line_browse_mode(Editor *e, const char *s);
 void handle_delete_insert_mode(Editor *e, const char *s);
 void handle_leave_insert_mode(Editor *e, const char *s);
 void handle_browse_cr(Editor *e, const char *s);
@@ -68,5 +69,6 @@ void handle_browse_to_end_of_line(Editor *e, const char *s);
 void handle_browse_to_begin_of_file(Editor *e, const char *s);
 void handle_browse_to_begin_of_line(Editor *e, const char *s);
 void handle_save(Editor *e, const char *s);
+void handle_goto_line(Editor *e, int l);
 
 #endif

@@ -1,15 +1,12 @@
 // WORKING ON:
-// delete not empty line
+// goto line number
 
 // BACKLOG:
-// make keybinding configurable via config file (JSON)
-// show message when saved, hide message on following action
 // search and jump to next search position
 // warn when quit without saving edited text
+// show message when saved, hide message on following action
 // bevore saving check if the file was changed in between
 // when opening with not existing file name create file
-// warn when quitting and not saved
-// goto line number
 // maybe Bug when row is empty (shows only #, which is but the sign for overscrolling a line aut of visible area)
 // : jump to the end or the beginning of line
 // move cursor by word
@@ -18,8 +15,10 @@
 // append to Line
 // append new line
 // move cursor in insert mode (emacs commands, arrow keys)
+// make keybinding configurable via config file (JSON)
 
 // READY
+// delete not empty line
 // backspace at crsr.col = 0 (append to prev line)
 // BUG goto end of last line, enter insert mode, enter CR, edit -> editor stalls
 // commandline for unit test mode or better another destination
@@ -59,10 +58,12 @@
 #define INITIAL_STRING_BUFFER_SIZE 1
 #define GOTO_FINISH(_ret_val) { ret_val = (_ret_val); goto finish; }
 
+#ifdef LEX_VERSION
 extern FILE *yyin;
 extern int  yylex(void);
 extern void lexer_initialize();
 extern void lexer_finalize();
+#endif
 
 // TODO 
 //typedef struct
@@ -368,6 +369,8 @@ finish:
     return ret_val;
 }
 
+
+#ifdef LEX_VERSION
 int lex_main(int argc, char *argv[])
 {
     // TODO code dupplication with real_main
@@ -518,6 +521,7 @@ finish:
     if(f) fclose(f);
     return ret_val;
 }
+#endif //LEX_VERSION
 
 #ifdef UNIT_TEST
 #include "tests.c"
@@ -530,11 +534,13 @@ finish:
             goto finish;
         }
         int res = 0;
-        //res |= test_insert_in_the_middle_of_a_line();
-        //res |= test_delete_empty_line();
-        //res |= test_delete_line_if_empty();
-        //res |= test_delete_line_if_empty_1();
+        res |= test_insert_in_the_middle_of_a_line();
+        res |= test_delete_empty_line();
+        res |= test_delete_line_if_empty();
+        res |= test_delete_line_if_empty_1();
         res |= test_backspace_beginn_of_line();
+        res |= test_delete_line();
+        res |= test_insert_behind_capacity();
         if(!res) fprintf(stderr, "all tests passed\n");
     finish:
         if(res) fprintf(stderr, "tests not passed\n");

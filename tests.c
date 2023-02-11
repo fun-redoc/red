@@ -21,7 +21,7 @@
     
 //jmp_buf try;
 
-int test_frame(Editor *initial, void (*testfn)(Editor *e, const char *s), Editor *expected)
+int test_frame(Editor *initial, void (*testfn)(Editor *e, const char *s), const char *s, Editor *expected)
 {
 
     Display d;
@@ -65,7 +65,7 @@ int test_frame(Editor *initial, void (*testfn)(Editor *e, const char *s), Editor
         //e.crsr.col = 5;
 
         // call the function / handler to test
-        testfn(initial, NULL);
+        testfn(initial, s);
 
         editor_render(initial, &editor_viewport, &d);
         editor_message_render(initial, &message_viewport, &d);
@@ -117,7 +117,7 @@ int test_delete_line_if_empty_1()
     };
 
     
-    ret_val = test_frame(&tested, handle_delete_insert_mode, &expected);
+    ret_val = test_frame(&tested, handle_delete_insert_mode, NULL, &expected);
 finish:
     fprintf(stderr, "TRACE: finishing test ret_val==%d\n", ret_val);
     editor_free(&tested);
@@ -164,7 +164,7 @@ int test_delete_line_if_empty()
     0
     };
 
-    ret_val = test_frame(&tested, handle_delete_insert_mode, &expected);
+    ret_val = test_frame(&tested, handle_delete_insert_mode, NULL,  &expected);
     
 finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
@@ -216,7 +216,7 @@ int test_delete_empty_line()
     editor_append_line(&expected, "1.123456789");
     editor_append_line(&expected, "3.123456789");
 
-    ret_val = test_frame(&tested, handle_delete_insert_mode, &expected);
+    ret_val = test_frame(&tested, handle_delete_insert_mode, NULL, &expected);
     
 finish:
     editor_free(&tested);
@@ -268,7 +268,7 @@ int test_insert_in_the_middle_of_a_line()
     editor_append_line(&expected, "56789");
     editor_append_line(&expected, "3.123456789");
 
-    ret_val = test_frame(&tested, handle_insert_cr, &expected);
+    ret_val = test_frame(&tested, handle_insert_cr, NULL, &expected);
 finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     editor_free(&tested);
@@ -323,12 +323,124 @@ int test_backspace_beginn_of_line()
     // crsr posss here                        ^
     editor_append_line(&expected, "3.123456789");
 
-    ret_val = test_frame(&tested, handle_backspace_insert_mode, &expected);
+    ret_val = test_frame(&tested, handle_backspace_insert_mode, NULL, &expected);
 finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     editor_free(&tested);
     editor_free(&expected);
     return ret_val;
 }
+
+int test_delete_line()
+{
+    // TEST Scenario
+    // 1. cursor is at pos 3 of a nonempty line
+    // 2. delete_line
+    // result should be:
+    //  - same with the line to delete less
+    //  - curosr line is decreased, cursor col is 0
+    int ret_val = 0;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1); // one for terminating \0
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    browse,
+    NULL,
+    0,
+    0,
+    {1,4}, // <- crsrs position
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&tested, "1.123456789");
+    editor_append_line(&tested, "2.123456789");
+    editor_append_line(&tested, "3.123456789");
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    browse,
+    NULL,
+    0,
+    0,
+    {0,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&expected, "1.123456789");
+    editor_append_line(&expected, "3.123456789");
+
+    ret_val = test_frame(&tested, handle_delete_line_browse_mode, NULL, &expected);
+finish:
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+    editor_free(&tested);
+    editor_free(&expected);
+    return ret_val;
+}
+
+int test_insert_behind_capacity()
+{
+    // TEST Scenario
+    // 1. cursor is at pos 3 of a nonempty line
+    // 2. delete_line
+    // result should be:
+    //  - same with the line to delete less
+    //  - curosr line is decreased, cursor col is 0
+    int ret_val = 0;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1); // one for terminating \0
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    {4,4}, // <- crsrs position
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&tested, "1.123456789");
+    editor_append_line(&tested, "2.123456789");
+    editor_append_line(&tested, "3.123456789");
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    {4,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&expected, "1.123456789");
+    editor_append_line(&expected, "2.123456789");
+    editor_append_line(&expected, "3.123456789");
+    editor_append_line(&expected, "");
+    editor_append_line(&expected, "hello");
+
+    ret_val = test_frame(&tested, handle_generic_insertmode, "hello", &expected);
+finish:
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+    editor_free(&tested);
+    editor_free(&expected);
+    return ret_val;
+}
+
 
 #endif
