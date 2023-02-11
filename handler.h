@@ -65,6 +65,7 @@ void handle_browse_cr(Editor *e, const char *s);
 void handle_insert_cr(Editor *e, const char *s);
 void handle_browse_to_end_of_file(Editor *e, const char *s);
 void handle_browse_to_end_of_line(Editor *e, const char *s);
+void handle_browse_to_begin_of_file(Editor *e, const char *s);
 void handle_browse_to_begin_of_line(Editor *e, const char *s);
 void handle_save(Editor *e, const char *s);
 

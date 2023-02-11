@@ -313,6 +313,11 @@ void handle_browse_to_begin_of_line(Editor *e, const char *s)
 {
     e->crsr.col = 0;
 }
+void handle_browse_to_begin_of_file(Editor *e, const char *s)
+{
+    e->crsr.col = 0;
+    e->crsr.line = 0;
+}
 
 void handle_save(Editor *e, const char *s)
 {                                    
