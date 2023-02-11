@@ -60,10 +60,11 @@
 <browse>\x24|\x05        handle_browse_to_end_of_line(&e, yytext); return 0; /* $ or ctrl-e */
 <browse>G                handle_browse_to_end_of_file(&e, yytext); return 0;
 <browse>0|\x01           handle_browse_to_begin_of_line(&e, yytext); return 0; /* 0 or ctrl-a */
-<browse>gg               handle_browse_to_begin_of_file(&e, yytext); return 0; /* 0 or ctrl-a */
+<browse>gg               handle_browse_to_begin_of_file(&e, yytext); return 0; 
 <browse>\x7f             handle_backspace_browse_mode(&e, yytext); return 0;
 <browse>d|\x04           handle_delete_browse_mode(&e, yytext); return 0;
 <browse>i                yy_push_state(insert); handle_enter_insert_mode(&e, yytext); return 0;
+<browse>s|\/|\xffffffe2\xffffff80\xffffff9a   yy_push_state(search); handle_enter_search_mode(&e, yytext); return 0;
 
 <browse>. {
     fprintf(stderr,"\"");
@@ -73,15 +74,39 @@
     fprintf(stderr,"\"\n");
 }
 
-<insert>\x1b            yy_pop_state(); handle_leave_insert_mode(&e, yytext); return 0;
-<insert>\x7f            handle_backspace_insert_mode(&e, yytext); return 0;
-<insert>\x04            handle_delete_insert_mode(&e, yytext); return 0;
-<insert>\n|\r\n         handle_insert_cr(&e, yytext); return 0;
+<insert>\x1b           yy_pop_state(); handle_leave_insert_mode(&e, yytext); return 0;
+<insert>\x18\x73       handle_save(&e, yytext); return 0;                 /* ctrl-x s - emacs like */
+<insert>\x1b\x5b\x44   handle_go_left(&e, yytext); return 0;
+<insert>\x1b\x5b\x43   handle_go_right(&e, yytext); return 0;
+<insert>\x1b\x5b\x42   handle_go_down(&e, yytext); return 0;
+<insert>\x1b\x5b\x41   handle_go_up(&e, yytext); return 0;
+<insert>\x05           handle_browse_to_end_of_line(&e, yytext); return 0; /* $ or ctrl-e */
+<insert>\x18\x65       handle_browse_to_end_of_file(&e, yytext); return 0; /* ctrl-x e */
+<insert>0|\x01         handle_browse_to_begin_of_line(&e, yytext); return 0; /* 0 or ctrl-a */
+<insert>\x14           handle_browse_to_begin_of_file(&e, yytext); return 0; /* ctrl-t */
+<insert>\x7f           handle_backspace_browse_mode(&e, yytext); return 0;
+<insert>\x04           handle_delete_insert_mode(&e, yytext); return 0;
+<insert>\n|\r\n        handle_insert_cr(&e, yytext); return 0;
+<insert>\xffffffe2\xffffff80\xffffff9a      yy_push_state(search); handle_enter_search_mode(&e, yytext); return 0; /* Meta(Option)-s */
 <insert>. {
+    fprintf(stderr,"\"");
+    for (int i = 0; i < yyleng; ++i) {
+        fprintf(stderr,"\\x%02x", yytext[i]);
+    }
+    fprintf(stderr,"\"\n");
     handle_generic_insertmode(&e, yytext); 
     return 0;
 }
 
+<search>\x1b            yy_pop_state(); handle_leave_search_mode(&e, yytext); return 0;
+<search>\x7f            handle_delete_search_mode(&e, yytext); return 0;
+<search>\x04            handle_delete_search_mode(&e, yytext); return 0;
+<search>\x1b\x5b\x44    handle_left_search_mode(&e, yytext); return 0;
+<search>\x1b\x5b\x43    handle_right_search_mode(&e, yytext); return 0;
+<search>. {
+    handle_generic_searchmode(&e, yytext); 
+    return 0;
+}
 %%
 
 void lexer_initialize() {
@@ -93,8 +118,6 @@ void lexer_finalize() {
 }
 
 /*
-handle_enter_search_mode(&e, yytext); return 0;
-handle_leave_search_mode(&e, yytext); return 0;
 handle_delete_search_mode(&e, yytext); return 0;
 handle_left_search_mode(&e, yytext); return 0;
 handle_right_search_mode(&e, yytext); return 0;

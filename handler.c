@@ -47,8 +47,8 @@ void rerender_all(      Display *d,
             editor_viewport->cols = d->cols-2;
             editor_render(e, editor_viewport, d);
 
-            //search_viewport->y0 = d->lines-1;
-            //search_viewport->cols = d->cols;
+            search_viewport->y0 = d->lines-1;
+            search_viewport->cols = d->cols;
             searchfield_render(e->search_field, search_viewport, d);
             break;
         }
