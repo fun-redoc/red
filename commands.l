@@ -65,7 +65,7 @@
 <browse>dd               handle_delete_line_browse_mode(&e, yytext); return 0;
 <browse>x|\x04           handle_delete_browse_mode(&e, yytext); return 0;
 <browse>i                yy_push_state(insert); handle_enter_insert_mode(&e, yytext); return 0;
-<browse>s|\/|\xffffffe2\xffffff80\xffffff9a   yy_push_state(search); handle_enter_search_mode(&e, yytext); return 0;
+<browse>s|\/             yy_push_state(search); handle_enter_search_mode(&e, yytext); return 0;
 <browse>[0-9]+gg {  
     fprintf(stderr, "<browse>[0-9]+gg\n");
     size_t tmp_len  = yyleng - 1;
@@ -105,7 +105,6 @@
 <insert>\x7f           handle_backspace_browse_mode(&e, yytext); return 0;
 <insert>\x04           handle_delete_insert_mode(&e, yytext); return 0;
 <insert>\n|\r\n        handle_insert_cr(&e, yytext); return 0;
-<insert>\xffffffe2\xffffff80\xffffff9a      yy_push_state(search); handle_enter_search_mode(&e, yytext); return 0; /* Meta(Option)-s */
 <insert>\x18\x63       handle_quit(&e, yytext); return 0; /* ctrl-x c */
 <insert>. {
     fprintf(stderr,"\"");
@@ -122,7 +121,9 @@
 <search>\x04            handle_delete_search_mode(&e, yytext); return 0;
 <search>\x1b\x5b\x44    handle_left_search_mode(&e, yytext); return 0;
 <search>\x1b\x5b\x43    handle_right_search_mode(&e, yytext); return 0;
+<search>\n|\r\n         yy_pop_state(); handle_search_next(&e, yytext); handle_leave_search_mode(&e, yytext); return 0;
 <search>. {
+    // TODO schlouldnt i check if yytext is only alnum?
     handle_generic_searchmode(&e, yytext); 
     return 0;
 }

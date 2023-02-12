@@ -1,23 +1,27 @@
 // WORKING ON:
-// goto line number
+// search and jump to next search position
+// message --NOT FOUND-- when not found
+// move cursor by word
 
 // BACKLOG:
-// search and jump to next search position
-// warn when quit without saving edited text
+// show information e.g. (col, row) in a status line
+// undo
 // show message when saved, hide message on following action
-// bevore saving check if the file was changed in between
-// when opening with not existing file name create file
-// maybe Bug when row is empty (shows only #, which is but the sign for overscrolling a line aut of visible area)
-// : jump to the end or the beginning of line
-// move cursor by word
-// move cursor by paragraph
-// insert at position
 // append to Line
 // append new line
-// move cursor in insert mode (emacs commands, arrow keys)
+// when opening with not existing file name create file
+// move cursor by paragraph
+// warn when quit without saving edited text
+// bevore saving check if the file was changed in between
+// maybe Bug when row is empty (shows only #, which is but the sign for overscrolling a line aut of visible area)
+// : jump to the end or the beginning of line
+// insert at position
+// show line numbers 
+// move cursor with number like vi
 // make keybinding configurable via config file (JSON)
 
 // READY
+// goto line number
 // delete not empty line
 // backspace at crsr.col = 0 (append to prev line)
 // BUG goto end of last line, enter insert mode, enter CR, edit -> editor stalls
@@ -541,6 +545,7 @@ finish:
         res |= test_backspace_beginn_of_line();
         res |= test_delete_line();
         res |= test_insert_behind_capacity();
+        res |= test_search_next();
         if(!res) fprintf(stderr, "all tests passed\n");
     finish:
         if(res) fprintf(stderr, "tests not passed\n");

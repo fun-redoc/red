@@ -360,3 +360,39 @@ void handle_goto_line(Editor *e, int l)
         e->crsr.line = MIN(l - 1, e->count-1);
     }
 }
+
+/**
+ * @brief searches for next occurences of s in lines, cursor is positioned accordigly
+ * 
+ * @param e in/out, contains the lines and stores the search result as array
+ * @param s 
+ */
+void handle_search_next(Editor *e, const char *s)
+{
+    fprintf(stderr, "handle_search_next\n");
+    if(!s || strlen(s) == 0) return;
+    // TODO use faster algorithm, Rabin Karp, Boyer-Moore, Knuth-Morris-Pratt etc.
+    size_t col = e->crsr.col;
+    size_t line = e->crsr.line;
+    char *found = NULL;
+    bool eof = false;
+    while(!(found || eof))
+    {
+        char *ptr = &(e->lines[line].content[col]);
+        found = strcasestr(ptr, s);
+        if(!found)
+        {
+            line += 1;
+            col = 0;
+        }
+        if(line >= e->count)
+        {
+            eof = true;
+        }
+    }
+    if(found)
+    {
+        e->crsr.line = line;
+        e->crsr.col = found - &(e->lines[line].content[0]);
+    }
+}

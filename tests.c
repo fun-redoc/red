@@ -442,5 +442,65 @@ finish:
     return ret_val;
 }
 
+int test_search_next()
+{
+    // TEST Scenario
+    int ret_val = 0;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1); // one for terminating \0
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    {0,3}, // <- crsrs position
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&tested, "1.123456789");
+    editor_append_line(&tested, "2.123456789 hallo");
+    editor_append_line(&tested, "hallo3.123456789");
+    editor_append_line(&tested, "4.123hallo456789");
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    insert,
+    NULL,
+    0,
+    0,
+    {1,12},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&expected, "1.123456789");
+    editor_append_line(&expected, "2.123456789 hallo");
+    editor_append_line(&expected, "hallo3.123456789");
+    editor_append_line(&expected, "4.123hallo456789");
+
+    ret_val = test_frame(&tested, handle_search_next, "hallo", &expected);
+    tested.crsr.col +=1;
+    expected.crsr.col = 0;
+    expected.crsr.line = 2;
+    ret_val |= test_frame(&tested, handle_search_next, "hallo", &expected);
+    tested.crsr.col +=1;
+    expected.crsr.col = 5;
+    expected.crsr.line = 3;
+    ret_val |= test_frame(&tested, handle_search_next, "hallo", &expected);
+
+finish:
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+    editor_free(&tested);
+    editor_free(&expected);
+    return ret_val;
+}
 
 #endif
