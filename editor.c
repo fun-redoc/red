@@ -46,6 +46,7 @@ void editor_free(Editor *e)
         if(e->search_field)
         {
             searchfield_free(e->search_field);
+            free(e->search_field);
             e->search_field = NULL;
         }
         if(e->message)

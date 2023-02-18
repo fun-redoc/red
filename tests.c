@@ -70,7 +70,8 @@ int test_frame(Editor *initial, void (*testfn)(Editor *e, const char *s), const 
         editor_render(initial, &editor_viewport, &d);
         editor_message_render(initial, &message_viewport, &d);
 
-        assert(editor_equals(initial, expected));
+        //assert(editor_equals(initial, expected));
+        ret_val = !editor_equals(initial, expected);
     
 finish:
     if(line) free(line);
@@ -122,6 +123,7 @@ finish:
     fprintf(stderr, "TRACE: finishing test ret_val==%d\n", ret_val);
     editor_free(&tested);
     editor_free(&expected);
+    assert(ret_val == 0);
     return ret_val;
 }
 
@@ -170,6 +172,7 @@ finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     editor_free(&tested);
     editor_free(&expected);
+    assert(ret_val == 0);
     return ret_val;
 }
 
@@ -221,6 +224,7 @@ int test_delete_empty_line()
 finish:
     editor_free(&tested);
     editor_free(&expected);
+    assert(ret_val == 0);
     return ret_val;
 }
 
@@ -273,6 +277,7 @@ finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     editor_free(&tested);
     editor_free(&expected);
+    assert(ret_val == 0);
     return ret_val;
 }
 
@@ -328,6 +333,7 @@ finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     editor_free(&tested);
     editor_free(&expected);
+    assert(ret_val == 0);
     return ret_val;
 }
 
@@ -382,6 +388,7 @@ finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     editor_free(&tested);
     editor_free(&expected);
+    assert(ret_val == 0);
     return ret_val;
 }
 
@@ -439,6 +446,7 @@ finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     editor_free(&tested);
     editor_free(&expected);
+    assert(ret_val == 0);
     return ret_val;
 }
 
@@ -450,56 +458,75 @@ int test_search_next()
     char *fname = malloc(strlen(test_file)+1); // one for terminating \0
     char *fname1 = malloc(strlen(test_file)+1);
 
+    SearchField *sf_test = searchfield_init();
+    searchfield_edit(sf_test, "hallo");
+
     Editor tested = {
     strcpy(fname, test_file),
-    insert,
+    search,
     NULL,
     0,
     0,
     {0,3}, // <- crsrs position
     {0,0},
-    NULL,
+    sf_test,
     NULL,
     0,
     0
     };
     editor_append_line(&tested, "1.123456789");
-    editor_append_line(&tested, "2.123456789 hallo");
+    editor_append_line(&tested, "2.123456789 Hallo");
     editor_append_line(&tested, "hallo3.123456789");
-    editor_append_line(&tested, "4.123hallo456789");
+    editor_append_line(&tested, "4.123hallo456hallo789");
+
+    SearchField *sf_expect = searchfield_init();
+    searchfield_edit(sf_expect, "hallo");
+    searchfield_remember_previous_search(sf_expect);
 
     Editor expected = {
     strcpy(fname1, test_file),
-    insert,
+    search,
     NULL,
     0,
     0,
     {1,12},
     {0,0},
-    NULL,
+    sf_expect,
     NULL,
     0,
     0
     };
     editor_append_line(&expected, "1.123456789");
-    editor_append_line(&expected, "2.123456789 hallo");
+    editor_append_line(&expected, "2.123456789 Hallo");
     editor_append_line(&expected, "hallo3.123456789");
-    editor_append_line(&expected, "4.123hallo456789");
+    editor_append_line(&expected, "4.123hallo456hallo789");
 
-    ret_val = test_frame(&tested, handle_search_next, "hallo", &expected);
+    ret_val = test_frame(&tested, handle_search_next, "HALLO", &expected);
+    assert(ret_val == 0);
     tested.crsr.col +=1;
     expected.crsr.col = 0;
     expected.crsr.line = 2;
     ret_val |= test_frame(&tested, handle_search_next, "hallo", &expected);
+    assert(ret_val == 0);
     tested.crsr.col +=1;
     expected.crsr.col = 5;
     expected.crsr.line = 3;
     ret_val |= test_frame(&tested, handle_search_next, "hallo", &expected);
-
+    assert(ret_val == 0);
+    tested.crsr.col +=1;
+    expected.crsr.col = 13;
+    expected.crsr.line = 3;
+    ret_val |= test_frame(&tested, handle_search_next, "hallo", &expected);
+    assert(ret_val == 0);
+    //tested.crsr.col +=1;
+    //expected.crsr.col = 12;
+    //expected.crsr.line = 0;
+    //ret_val |= test_frame(&tested, handle_search_next, "hallo", &expected);
 finish:
     fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
     editor_free(&tested);
     editor_free(&expected);
+    assert(ret_val == 0);
     return ret_val;
 }
 

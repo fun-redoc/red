@@ -11,6 +11,7 @@ SearchField *searchfield_init()
     sf->content_capacity = INITIAL_SEARCH_FIELD_SIZE;
     sf->content = malloc(sizeof(char) * sf->content_capacity);
     sf->content_count = 0;
+    sf->prev_search = NULL;
     return sf;
 }
 void searchfield_free(SearchField *sf)
@@ -22,6 +23,10 @@ void searchfield_free(SearchField *sf)
         sf->content = NULL;
         sf->content_count = 0;
         sf->crsr = (Cursor){0, 0};
+        if(sf->prev_search)
+        {
+            free(sf->prev_search);
+        }
     }
 }
 void searchfield_expand(SearchField *sf)
@@ -116,6 +121,27 @@ bool searchfield_equal(const SearchField *s1, const SearchField *s2)
         //res &= s1->content_capacity == s2->content_capacity;
         res &= s1->content_count == s2->content_count;
         res &= (0 == strncmp(s1->content, s2->content, s1->content_count));
+        res &= (s1->prev_search == NULL && s2->prev_search == NULL) ||
+               ((s1->prev_search != NULL && s2->prev_search != NULL) && (0 == strcmp(s1->prev_search, s2->prev_search)));
     }
     return res;
+}
+
+void searchfield_remember_previous_search(SearchField *sf)
+{
+    assert(sf);
+    if(sf->prev_search) free(sf->prev_search);
+    if(sf->content && sf->content_count > 0)
+    {
+        sf->prev_search = calloc(sf->content_count+1, sizeof(char)); // calloc fills with \0
+        strncpy(sf->prev_search, sf->content, sf->content_count);
+    }
+}
+
+bool searchfield_same_as_previous_search(SearchField *sf)
+{
+    assert(sf);
+    if(!sf->prev_search) return false;
+    if(sf->content_count < 1) return false;
+    return 0 == strncmp(sf->prev_search, sf->content, sf->content_count);
 }

@@ -14,10 +14,13 @@ typedef struct
     char *content;
     size_t content_capacity;
     size_t content_count;
+    char *prev_search;
 } SearchField;
 
 SearchField *searchfield_init();
 void searchfield_free(SearchField *sf);
+void searchfield_remember_previous_search(SearchField *sf);
+bool searchfield_same_as_previous_search(SearchField *sf);
 void searchfield_edit(SearchField *sf, const char *s);
 void searchfield_render(const SearchField *sf, Viewport *v, Display *d);
 void searchfield_delete(SearchField *sf);

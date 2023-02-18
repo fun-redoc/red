@@ -18,6 +18,7 @@
 #include "editor.h"
 #include "handler.h"
 
+#define UNUSED(x) (void)(x)
 
 extern jmp_buf try; // TODO alternatively pass try pointer in all methods as param
 
@@ -361,25 +362,90 @@ void handle_goto_line(Editor *e, int l)
     }
 }
 
+const char *substr_no_case(const char *hay, size_t hay_len, const char *needle, size_t needle_len)
+{
+    const char *res;
+    if(!hay) return NULL;
+    if(!needle) return NULL;
+
+    size_t len = needle_len;
+    if(hay_len < 1) return NULL;
+    if(len < 1) return NULL;
+    if(hay_len < len) return NULL;
+
+    char *s1 = calloc((hay_len+1), sizeof(char));
+    if(!s1){
+        fprintf(stderr, "Failed to alloc memory in %s:%d\n", __FILE__, __LINE__);
+        res = NULL;
+        goto finish;
+    } 
+    char *s2 = calloc(len+1, sizeof(char));
+    if(!s2){
+        fprintf(stderr, "Failed to alloc memory in %s:%d\n", __FILE__, __LINE__);
+        res = NULL;
+        goto finish;
+    } 
+
+    strncpy(s1, hay, hay_len);
+    s1[hay_len] ='\0';
+    // to lower
+    for(char *p=s1; *p; p++) *p=tolower(*p);
+    
+    strncpy(s2, needle, len);
+    s2[len] ='\0';
+    // to lower
+    for(char *p=s2; *p; p++) *p=tolower(*p);
+
+    const char *found = strstr(s1,s2);
+    if(!found){
+        res = NULL;
+        goto finish;
+    } 
+
+    size_t found_pos = found-s1;
+    res = &(hay[found_pos]);
+finish:
+    if(s1) free(s1);
+    if(s2) free(s2);
+    return res;
+}
+
 /**
  * @brief searches for next occurences of s in lines, cursor is positioned accordigly
  * 
  * @param e in/out, contains the lines and stores the search result as array
  * @param s 
  */
-void handle_search_next(Editor *e, const char *s)
+void handle_search_next(Editor *e, const char *unused)
 {
-    fprintf(stderr, "handle_search_next\n");
-    if(!s || strlen(s) == 0) return;
+    UNUSED(unused);
+    assert(e);
+    assert(e->search_field);
+    const char* s = e->search_field->content;
+    size_t len_s = e->search_field->content_count;
+    fprintf(stderr, "handle_search_next: starting at line %zu col %zu\n", e->crsr.line, e->crsr.col);
+    if(!s || len_s == 0) return;
     // TODO use faster algorithm, Rabin Karp, Boyer-Moore, Knuth-Morris-Pratt etc.
     size_t col = e->crsr.col;
     size_t line = e->crsr.line;
-    char *found = NULL;
-    bool eof = false;
+    if(searchfield_same_as_previous_search(e->search_field))
+    {
+        // avoid finding the same
+        col += 1;
+    }
+    const char *found = NULL;
+    bool eof = !(line >= 0 && line < e->count && col >=0);
     while(!(found || eof))
     {
-        char *ptr = &(e->lines[line].content[col]);
-        found = strcasestr(ptr, s);
+        found = NULL;
+        if(col < e->lines[line].filled_size)
+        {
+            char *ptr = &(e->lines[line].content[col]);
+            size_t rem_len = e->lines[line].filled_size - col;
+            // strcasestr relies on terminating \0, not usefull here
+            //found = strcasestr(ptr, s);
+            found = substr_no_case(ptr, rem_len, s, len_s);
+        }
         if(!found)
         {
             line += 1;
@@ -392,7 +458,10 @@ void handle_search_next(Editor *e, const char *s)
     }
     if(found)
     {
+        size_t new_col = found - &(e->lines[line].content[0]);
+        e->crsr.col = new_col;
         e->crsr.line = line;
-        e->crsr.col = found - &(e->lines[line].content[0]);
+        searchfield_remember_previous_search(e->search_field);
+        fprintf(stderr, "handle_search_next: found at line %zu col %zu\n", e->crsr.line, e->crsr.col);
     }
 }
