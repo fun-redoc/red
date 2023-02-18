@@ -1,6 +1,4 @@
 // WORKING ON:
-// search and jump to next search position
-// message --NOT FOUND-- when not found
 // move cursor by word
 
 // BACKLOG:
@@ -21,6 +19,8 @@
 // make keybinding configurable via config file (JSON)
 
 // READY
+// message --NOT FOUND-- when not found
+// search and jump to next search position
 // goto line number
 // delete not empty line
 // backspace at crsr.col = 0 (append to prev line)

@@ -1,4 +1,3 @@
-#ifndef __EDITOR_H__
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <signal.h>
+#include <ctype.h>
 #include "maybe.h"
 #include "defs.h"
 #include "display.h"
@@ -17,6 +17,54 @@
 
 #define LINE_INITIAL_SIZE 1 // increas for "procductive" usage
 #define LINE_GROTH_FACTOR 2
+
+const char *substr_no_case(const char *hay, size_t hay_len, const char *needle, size_t needle_len)
+{
+    const char *res;
+    if(!hay) return NULL;
+    if(!needle) return NULL;
+
+    size_t len = needle_len;
+    if(hay_len < 1) return NULL;
+    if(len < 1) return NULL;
+    if(hay_len < len) return NULL;
+
+    char *s1 = calloc((hay_len+1), sizeof(char));
+    if(!s1){
+        fprintf(stderr, "Failed to alloc memory in %s:%d\n", __FILE__, __LINE__);
+        res = NULL;
+        goto finish;
+    } 
+    char *s2 = calloc(len+1, sizeof(char));
+    if(!s2){
+        fprintf(stderr, "Failed to alloc memory in %s:%d\n", __FILE__, __LINE__);
+        res = NULL;
+        goto finish;
+    } 
+
+    strncpy(s1, hay, hay_len);
+    s1[hay_len] ='\0';
+    // to lower
+    for(char *p=s1; *p; p++) *p=tolower(*p);
+    
+    strncpy(s2, needle, len);
+    s2[len] ='\0';
+    // to lower
+    for(char *p=s2; *p; p++) *p=tolower(*p);
+
+    const char *found = strstr(s1,s2);
+    if(!found){
+        res = NULL;
+        goto finish;
+    } 
+
+    size_t found_pos = found-s1;
+    res = &(hay[found_pos]);
+finish:
+    if(s1) free(s1);
+    if(s2) free(s2);
+    return res;
+}
 
 int editor_init(Editor* e)
 {
@@ -241,7 +289,12 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     fprintf(stderr, "after crsr.line=%zu, crsr.col=%zu\n", e->crsr.line, e->crsr.col);
 }
 
-void editor_set_message(Editor *e, const char *s)
+bool editor_message_check(const Editor *e)
+{
+    return e->message_count > 0 && e->message;
+}
+
+void editor_message_set(Editor *e, const char *s)
 {
     if(!s || strlen(s) == 0)
     {
@@ -526,4 +579,57 @@ bool editor_equals(const Editor *e1,const Editor *e2)
     return res;
 }
 
-#endif
+bool editor_search_next(Editor *e)
+{
+    assert(e);
+    assert(e->search_field);
+    const char* s = e->search_field->content;
+    size_t len_s = e->search_field->content_count;
+    fprintf(stderr, "handle_search_next: starting at line %zu col %zu\n", e->crsr.line, e->crsr.col);
+    if(!s || len_s == 0) return false;
+    // TODO use faster algorithm, Rabin Karp, Boyer-Moore, Knuth-Morris-Pratt etc.
+    size_t col = e->crsr.col;
+    size_t line = e->crsr.line;
+    if(searchfield_same_as_previous_search(e->search_field))
+    {
+        // avoid finding the same
+        col += 1;
+    }
+    const char *found = NULL;
+    bool eof = !(line >= 0 && line < e->count && col >=0);
+    while(!(found || eof))
+    {
+        found = NULL;
+        if(col < e->lines[line].filled_size)
+        {
+            char *ptr = &(e->lines[line].content[col]);
+            size_t rem_len = e->lines[line].filled_size - col;
+            // strcasestr relies on terminating \0, not usefull here
+            //found = strcasestr(ptr, s);
+            found = substr_no_case(ptr, rem_len, s, len_s);
+        }
+        if(!found)
+        {
+            line += 1;
+            col = 0;
+        }
+        if(line >= e->count)
+        {
+            eof = true;
+        }
+    }
+    if(found)
+    {
+        size_t new_col = found - &(e->lines[line].content[0]);
+        e->crsr.col = new_col;
+        e->crsr.line = line;
+        searchfield_remember_previous_search(e->search_field);
+        fprintf(stderr, "handle_search_next: found at line %zu col %zu\n", e->crsr.line, e->crsr.col);
+        return true;
+    }
+    else
+    {
+        fprintf(stderr, "handle_search_next: not found \n");
+        return false;
+    }
+}

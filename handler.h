@@ -33,7 +33,7 @@ MAYBE(size_t) file_size(const char *path);
 
 // TODO separate rendering
 void rerender_all(      Display *d,
-                  const Editor   *e,
+                        Editor   *e,
                         Viewport *editor_viewport,
                         Viewport *search_viewport,
                         Viewport *message_viewport);

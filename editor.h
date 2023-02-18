@@ -60,9 +60,11 @@ void editor_delete_at_crsr(Editor *e);
 void editor_delete_line_at_crsr(Editor *e);
 void editor_backspace_at_crsr(Editor *e);
 
-void editor_set_message(Editor *e, const char *s);
+void editor_message_set(Editor *e, const char *s);
 void editor_message_render(const Editor *e, const Viewport *v, Display *d);
+bool editor_message_check(const Editor *e);
 
+bool editor_search_next(Editor *e);
 
 bool editor_equals(const Editor *e1, const Editor *e2);
 
