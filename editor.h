@@ -65,6 +65,8 @@ void editor_message_render(const Editor *e, const Viewport *v, Display *d);
 bool editor_message_check(const Editor *e);
 
 bool editor_search_next(Editor *e);
+Cursor editor_next_word(Editor *e);
+Cursor editor_prev_word(Editor *e);
 
 bool editor_equals(const Editor *e1, const Editor *e2);
 

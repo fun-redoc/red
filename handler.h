@@ -79,5 +79,7 @@ void handle_go_down(Editor *e, const char* s);
 void handle_go_up(Editor *e, const char* s);
 void handle_save(Editor *e, const char *s);
 void handle_goto_line(Editor *e, int l);
+void handle_next_word(Editor *e, const char *unused);
+void handle_prev_word(Editor *e, const char *unused);
 
 #endif

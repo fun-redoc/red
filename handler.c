@@ -395,3 +395,15 @@ void handle_search_next(Editor *e, const char *unused)
         editor_message_set(e, "-- NOT FOUND --");
     }
 }
+
+void handle_next_word(Editor *e, const char *unused)
+{
+    Cursor new_crsr = editor_next_word(e);
+    e->crsr = new_crsr;
+}
+
+void handle_prev_word(Editor *e, const char *unused)
+{
+    Cursor new_crsr = editor_prev_word(e);
+    e->crsr = new_crsr;
+}

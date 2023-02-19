@@ -214,6 +214,22 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
 {
     fprintf(stderr, "entering editor_render\n");
     assert(e!=NULL && disp!=NULL && v!=NULL);
+    // crop cursor to used area
+    Cursor crsr = e->crsr;
+    if(crsr.line >= e->count)
+    {
+        crsr.line = e->count;
+        if(crsr.line > 0) crsr.line -= 1;
+    }
+    if(e->count > 0 && e->lines != NULL && crsr.col >= e->lines[crsr.line].filled_size)
+    {
+        crsr.col = e->lines[crsr.line].filled_size;
+        if(crsr.col > 0) crsr.col -= 1;
+    }
+    else
+    {
+        crsr.col = 0;
+    }
     // viewport has to fit into Display
     if(!(v->x0 + v->cols <= disp->cols)) return;
     if(!(v->y0 + v->lines <= disp->lines)) return;
@@ -223,35 +239,35 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     // prepare cursors
     // TODO maybe vieportOffset (scolling offset) ist better located in Display instead of Editor
     //scroll to the right if necessary
-    if(e->crsr.col >= v->scrollOffset.cols + v->cols)
+    if(crsr.col >= v->scrollOffset.cols + v->cols)
     {
-        if(v->scrollOffset.cols + v->cols <= e->lines[e->crsr.line].filled_size)
+        if(v->scrollOffset.cols + v->cols <= e->lines[crsr.line].filled_size)
         {
-            v->scrollOffset.cols = e->crsr.col  - v->cols;
+            v->scrollOffset.cols = crsr.col  - v->cols;
             //v->scrollOffset.cols += 1;
         }
     }
     //scroll to the left if necessary
-    if(e->crsr.col >= 0 && 
-       e->crsr.col < v->scrollOffset.cols)
+    if(crsr.col >= 0 && 
+       crsr.col < v->scrollOffset.cols)
     {
-        v->scrollOffset.cols = e->crsr.col;
+        v->scrollOffset.cols = crsr.col;
     }
     // scroll down
-    if(e->crsr.line > v->lines-1)
+    if(crsr.line > v->lines-1)
     {
         if(e->count - v->scrollOffset.lines >= v->lines-1)
         {
             fprintf(stderr, "continuing editor_render - scroll down\n");
-            v->scrollOffset.lines = e->crsr.line - v->lines +1;
+            v->scrollOffset.lines = crsr.line - v->lines +1;
             //v->scrollOffset.lines +=1;
         }
     }
     // scroll up
-    if(e->crsr.line < v->scrollOffset.lines)
+    if(crsr.line < v->scrollOffset.lines)
     {
         fprintf(stderr, "continuing editor_render - scroll up\n");
-        v->scrollOffset.lines =e->crsr.line;
+        v->scrollOffset.lines =crsr.line;
     }
 
     // render scroll
@@ -282,11 +298,11 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     } 
 
     // set cursor in scroll
-    fprintf(stderr, "before crsr.line=%zu, crsr.col=%zu\n", e->crsr.line, e->crsr.col);
-    int crsr_col = e->crsr.col - v->scrollOffset.cols; // can get negative?
+    fprintf(stderr, "before crsr.line=%zu, crsr.col=%zu\n", crsr.line, crsr.col);
+    int crsr_col = crsr.col - v->scrollOffset.cols; // can get negative?
     disp->crsr.col  = v->x0 + MAX(0,crsr_col);
-    disp->crsr.line = e->crsr.line - v->scrollOffset.lines +v->y0;
-    fprintf(stderr, "after crsr.line=%zu, crsr.col=%zu\n", e->crsr.line, e->crsr.col);
+    disp->crsr.line = crsr.line - v->scrollOffset.lines +v->y0;
+    fprintf(stderr, "after crsr.line=%zu, crsr.col=%zu\n", crsr.line, crsr.col);
 }
 
 bool editor_message_check(const Editor *e)
@@ -632,4 +648,127 @@ bool editor_search_next(Editor *e)
         fprintf(stderr, "handle_search_next: not found \n");
         return false;
     }
+}
+
+bool isstop(char c)
+{
+    if(isblank(c)) return true;
+    static const char stops[] = {';',',','.','\0'};
+    for(const char *p=stops; *p; p++)
+    {
+        if(*p == c) return true; 
+    }
+    return false;
+}
+
+Cursor editor_next_word(Editor *e)
+{
+    Cursor crsr = e->crsr;
+    if(e->count == 0)
+    {
+        return crsr;
+    }
+    if(e->count == 1 && e->lines[0].filled_size == 0) {
+        return crsr;
+    }
+
+    if(crsr.line >= e->count) 
+    {
+        crsr.line = 0;
+        crsr.col = 0;
+    }
+    // consume until whitespace
+    for(;crsr.col < e->lines[crsr.line].filled_size && !isstop(e->lines[crsr.line].content[crsr.col])
+        ; crsr.col++);
+    // consume all blanks
+    for(;crsr.col < e->lines[crsr.line].filled_size && isstop(e->lines[crsr.line].content[crsr.col])
+        ; crsr.col++);
+    if(crsr.col >= e->lines[crsr.line].filled_size) {
+        crsr.col = 0;
+        crsr.line += 1; 
+        if(crsr.line >= e->count) crsr.line = 0;
+        // consume all blanks
+        for(;crsr.col < e->lines[crsr.line].filled_size && isblank(e->lines[crsr.line].content[crsr.col])
+            ; crsr.col++);
+    } 
+    return crsr;
+}
+
+
+Cursor editor_prev_word(Editor *e)
+{
+    // TODO does not go to the beginning of the word sticks in the end
+    // TODO does not go to prev line
+    Cursor crsr = e->crsr;
+    if(e->count == 0)
+    {
+        return crsr;
+    }
+    if(e->count == 1 && e->lines[0].filled_size == 0) {
+        return crsr;
+    }
+
+    if(crsr.line >= e->count)
+    {
+        crsr.line = e->count;
+        if(crsr.line > 0) crsr.line -= 1;
+    }
+    if(crsr.col >= e->lines[crsr.line].filled_size)
+    {
+        crsr.col  = e->lines[crsr.line].filled_size;
+        if(crsr.col > 0) crsr.col -= 1;
+    }
+
+    if(crsr.line == 0 && crsr.col == 0) 
+    {
+        crsr.line = e->count - 1;
+        crsr.col  = e->lines[crsr.line].filled_size;
+        if(crsr.col > 0) crsr.col -= 1;
+    }
+
+    if(!isstop(e->lines[crsr.line].content[crsr.col]))
+    {
+        // start in the middle of a word, goto beginning word
+        // except when it already was the beginning 
+
+        if(crsr.col > 0)
+        {
+            crsr.col -= 1;
+        }
+        else
+        {
+            if(crsr.line > 0)
+            {
+                crsr.line -= 1;
+            }
+            else
+            {
+                crsr.line = e->count - 1;
+            }
+            crsr.col = e->lines[crsr.line].filled_size;
+            if(crsr.col > 0) crsr.col -= 1;
+        }
+    }
+    // start on a blank
+    // consume all blanks
+    for(;crsr.col > 0 && isstop(e->lines[crsr.line].content[crsr.col])
+        ; crsr.col--);
+    if(crsr.col == 0 && isstop(e->lines[crsr.line].content[crsr.col]))
+    {
+        if(crsr.line > 0)
+        {
+            crsr.line -= 1;
+        }
+        else
+        {
+            crsr.line = e->count -1;
+        }
+        crsr.col = e->lines[crsr.line].filled_size;
+        if(crsr.col > 0) crsr.col -= 1;
+    }
+    // consume until whitespace reached
+    for(;crsr.col > 0 && !isstop(e->lines[crsr.line].content[crsr.col-1])
+        ; crsr.col--);
+
+    return crsr;
 }

@@ -1,5 +1,4 @@
 // WORKING ON:
-// move cursor by word
 
 // BACKLOG:
 // show information e.g. (col, row) in a status line
@@ -19,6 +18,7 @@
 // make keybinding configurable via config file (JSON)
 
 // READY
+// move cursor by word
 // message --NOT FOUND-- when not found
 // search and jump to next search position
 // goto line number
@@ -546,6 +546,7 @@ finish:
         res |= test_delete_line();
         res |= test_insert_behind_capacity();
         res |= test_search_next();
+        res |= test_prev_word();
         if(!res) fprintf(stderr, "all tests passed\n");
     finish:
         if(res) fprintf(stderr, "tests not passed\n");

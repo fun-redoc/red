@@ -66,6 +66,8 @@
 <browse>x|\x04           handle_delete_browse_mode(&e, yytext); return 0;
 <browse>i                yy_push_state(insert); handle_enter_insert_mode(&e, yytext); return 0;
 <browse>s|\/             yy_push_state(search); handle_enter_search_mode(&e, yytext); return 0;
+<browse>w                handle_next_word(&e, yytext); return 0;
+<browse>b                handle_prev_word(&e, yytext); return 0;
 <browse>[0-9]+gg {  
     fprintf(stderr, "<browse>[0-9]+gg\n");
     size_t tmp_len  = yyleng - 1;

@@ -530,4 +530,129 @@ finish:
     return ret_val;
 }
 
+int test_prev_word()
+{
+    // TEST Scenario
+    int ret_val = 0;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1); // one for terminating \0
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    search,
+    NULL,
+    0,
+    0,
+    {123,234}, // <- crsrs position
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    //                           00000000011111111112
+    //                           12345678901234567890
+    editor_append_line(&tested, "1. hallo hallo");
+    editor_append_line(&tested, "2. Foo Bar; Hallo");
+    editor_append_line(&tested, "");
+    editor_append_line(&tested, "");
+    editor_append_line(&tested, "");
+    editor_append_line(&tested, "");
+    editor_append_line(&tested, "8. Foo Bar; Hallo");
+    //                           00000000011111111112
+    //                           12345678901234567890
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    search,
+    NULL,
+    0,
+    0,
+    {6,12},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    //                             00000000011111111112
+    //                             12345678901234567890
+    editor_append_line(&expected, "1. hallo hallo");
+    editor_append_line(&expected, "2. Foo Bar; Hallo");
+    editor_append_line(&expected, "");
+    editor_append_line(&expected, "");
+    editor_append_line(&expected, "");
+    editor_append_line(&expected, "");
+    editor_append_line(&expected, "8. Foo Bar; Hallo");
+    //                             00000000011111111112
+    //                             12345678901234567890
+
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 7;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 3;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 0;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 0;
+    expected.crsr.line -= 1;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 0;
+    expected.crsr.line -= 1;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 0;
+    expected.crsr.line -= 1;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 0;
+    expected.crsr.line -= 1;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 12;
+    expected.crsr.line -= 1;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 7;
+    expected.crsr.line -= 0;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 3;
+    expected.crsr.line -= 0;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 0;
+    expected.crsr.line -= 0;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 9;
+    expected.crsr.line -= 1;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 3;
+    expected.crsr.line -= 0;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 0;
+    expected.crsr.line -= 0;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+    expected.crsr.col = 12;
+    expected.crsr.line = 6;
+    ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
+    assert(ret_val == 0);
+finish:
+    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+    editor_free(&tested);
+    editor_free(&expected);
+    assert(ret_val == 0);
+    return ret_val;
+}
+
 #endif
