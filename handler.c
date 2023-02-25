@@ -122,7 +122,7 @@ MAYBE(size_t) file_size(const char *path)
 //{
 //    // TODO 
 //    // maybe better handle resizing here instead of in the game loop?
-//    fprintf(stderr, "handling resize\n");
+
 //    rerender_all();
 //}
 
@@ -318,13 +318,13 @@ void handle_browse_to_end_of_file(Editor *e, const char *s)
 {
     e->crsr.line = e->count-1;
     e->crsr.col = e->lines[e->crsr.line].filled_size;
-    fprintf(stderr, "continuing handle_browse_to_end_of_file %zu %zu\n",e->crsr.line, e->crsr.col);
-    fprintf(stderr, "%s\n",e->lines[e->crsr.line].content);
+
+
 }
 
 void handle_browse_to_end_of_line(Editor *e, const char *s)
 {
-    fprintf(stderr, "in handle_browse_to_end_of_line %zu %zu %zu\n",e->count, e->crsr.line, e->crsr.col);
+
     if(e->crsr.line < e->count)
     {
         if(e->lines[e->crsr.line].filled_size > 0)
@@ -332,7 +332,7 @@ void handle_browse_to_end_of_line(Editor *e, const char *s)
             e->crsr.col = e->lines[e->crsr.line].filled_size-1;
         }
     }
-    fprintf(stderr, "in handle_browse_to_end_of_line %zu %zu\n",e->crsr.line, e->crsr.col);
+
 }
 
 void handle_browse_to_begin_of_line(Editor *e, const char *s)
@@ -373,10 +373,10 @@ void handle_save(Editor *e, const char *s)
 
 void handle_goto_line(Editor *e, int l)
 {
-    fprintf(stderr, "handle_goto_line %d \n", l);
+
     if(l > 0)
     {
-        fprintf(stderr, "handle_goto_line 01\n");
+
         e->crsr.line = MIN(l - 1, e->count-1);
     }
 }

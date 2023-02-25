@@ -178,41 +178,9 @@ bool editor_append_line(Editor *e, const char *s)
     return true;
 }
 
-//bool old_editor_append_line(Editor *e, const char *s)
-//{
-//    assert(e && s);
-//
-//    size_t new_size;
-//    if(e->lines == NULL)
-//    {
-//        new_size = 1;
-//        e->lines = malloc(sizeof(Line));
-//    }
-//    else
-//    {
-//        new_size = e->total_size + 1;
-//        e->lines = realloc(e->lines, sizeof(Line)*(new_size));
-//    }
-//    if(e->lines == NULL) return false;
-//    e->total_size = new_size;
-//
-//    size_t l = e->total_size - 1;
-//    size_t slen = strlen(s);
-//    if(s[slen-1] == '\n') slen -= 1; // skip new line
-//    e->lines[l].total_size = MAX(LINE_INITIAL_SIZE, slen);
-//
-//    e->lines[l].content = malloc(sizeof(char)*(e->lines[l].total_size));
-//    if(!e->lines[l].content) return false;
-//
-//    memcpy(e->lines[l].content, s, slen);
-//    e->lines[l].filled_size = slen;
-//
-//    return true;
-//}
-
 void editor_render(const Editor *e, Viewport *v, Display *disp)
 {
-    fprintf(stderr, "entering editor_render\n");
+
     assert(e!=NULL && disp!=NULL && v!=NULL);
     // crop cursor to used area
     Cursor crsr = e->crsr;
@@ -221,20 +189,22 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
         crsr.line = e->count;
         if(crsr.line > 0) crsr.line -= 1;
     }
-    if(e->count > 0 && e->lines != NULL && crsr.col >= e->lines[crsr.line].filled_size)
+    //if(e->count > 0 && e->lines != NULL && crsr.col >= e->lines[crsr.line].filled_size)
+    if(e->count > 0 && e->lines != NULL && crsr.col > e->lines[crsr.line].filled_size)
     {
         crsr.col = e->lines[crsr.line].filled_size;
         if(crsr.col > 0) crsr.col -= 1;
     }
-    else
-    {
-        crsr.col = 0;
-    }
+    //else
+    //{
+    //    crsr.col = 0;
+    //}
+
     // viewport has to fit into Display
     if(!(v->x0 + v->cols <= disp->cols)) return;
     if(!(v->y0 + v->lines <= disp->lines)) return;
     
-    fprintf(stderr, "continuing editor_render crsr.col=%zu\n", e->crsr.col);
+
 
     // prepare cursors
     // TODO maybe vieportOffset (scolling offset) ist better located in Display instead of Editor
@@ -258,7 +228,7 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     {
         if(e->count - v->scrollOffset.lines >= v->lines-1)
         {
-            fprintf(stderr, "continuing editor_render - scroll down\n");
+
             v->scrollOffset.lines = crsr.line - v->lines +1;
             //v->scrollOffset.lines +=1;
         }
@@ -266,7 +236,7 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     // scroll up
     if(crsr.line < v->scrollOffset.lines)
     {
-        fprintf(stderr, "continuing editor_render - scroll up\n");
+
         v->scrollOffset.lines =crsr.line;
     }
 
@@ -298,11 +268,11 @@ void editor_render(const Editor *e, Viewport *v, Display *disp)
     } 
 
     // set cursor in scroll
-    fprintf(stderr, "before crsr.line=%zu, crsr.col=%zu\n", crsr.line, crsr.col);
+
     int crsr_col = crsr.col - v->scrollOffset.cols; // can get negative?
     disp->crsr.col  = v->x0 + MAX(0,crsr_col);
     disp->crsr.line = crsr.line - v->scrollOffset.lines +v->y0;
-    fprintf(stderr, "after crsr.line=%zu, crsr.col=%zu\n", crsr.line, crsr.col);
+
 }
 
 bool editor_message_check(const Editor *e)
@@ -389,17 +359,17 @@ void editor_insert(Editor *e, const char *s, size_t len)
 {
     assert(e);
     assert(s != NULL && len > 0 && strnlen(s, len) > 0);
-    fprintf(stderr, "hier 1\n");
+
     if(e->count > e->crsr.line)
     {
-        fprintf(stderr, "hier 2\n");
+
         // edit exising line
         #define cur_line (e->lines[e->crsr.line])
         //size_t needed_capcacity = strlen(s) + cur_line.filled_size;
         size_t needed_capcacity = len + cur_line.filled_size;
         if(needed_capcacity < cur_line.total_size)
         {
-            fprintf(stderr, "hier 3\n");
+
             
             // entry fits current allocated cur_line.space
             assert(e->crsr.col+1 < cur_line.total_size);
@@ -415,11 +385,11 @@ void editor_insert(Editor *e, const char *s, size_t len)
         }
         else
         {
-            fprintf(stderr, "hier 4\n");
+
             size_t new_total_size = MAX(1, cur_line.total_size * LINE_GROTH_FACTOR);
             while(new_total_size < needed_capcacity) new_total_size *= LINE_GROTH_FACTOR; 
             
-            fprintf(stderr, "hier 5\n");
+
             cur_line.content = realloc(cur_line.content, sizeof(char)*new_total_size);
             if(!cur_line.content)
             {
@@ -601,7 +571,7 @@ bool editor_search_next(Editor *e)
     assert(e->search_field);
     const char* s = e->search_field->content;
     size_t len_s = e->search_field->content_count;
-    fprintf(stderr, "handle_search_next: starting at line %zu col %zu\n", e->crsr.line, e->crsr.col);
+
     if(!s || len_s == 0) return false;
     // TODO use faster algorithm, Rabin Karp, Boyer-Moore, Knuth-Morris-Pratt etc.
     size_t col = e->crsr.col;
@@ -640,12 +610,12 @@ bool editor_search_next(Editor *e)
         e->crsr.col = new_col;
         e->crsr.line = line;
         searchfield_remember_previous_search(e->search_field);
-        fprintf(stderr, "handle_search_next: found at line %zu col %zu\n", e->crsr.line, e->crsr.col);
+
         return true;
     }
     else
     {
-        fprintf(stderr, "handle_search_next: not found \n");
+
         return false;
     }
 }

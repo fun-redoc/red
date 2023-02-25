@@ -60,7 +60,6 @@
 <browse>\x24|\x05        handle_browse_to_end_of_line(&e, yytext); return 0; /* $ or ctrl-e */
 <browse>G                handle_browse_to_end_of_file(&e, yytext); return 0;
 <browse>0|\x01           handle_browse_to_begin_of_line(&e, yytext); return 0; /* 0 or ctrl-a */
-<browse>gg               handle_browse_to_begin_of_file(&e, yytext); return 0; 
 <browse>\x7f             handle_backspace_browse_mode(&e, yytext); return 0;
 <browse>dd               handle_delete_line_browse_mode(&e, yytext); return 0;
 <browse>x|\x04           handle_delete_browse_mode(&e, yytext); return 0;
@@ -68,17 +67,18 @@
 <browse>s|\/             yy_push_state(search); handle_enter_search_mode(&e, yytext); return 0;
 <browse>w                handle_next_word(&e, yytext); return 0;
 <browse>b                handle_prev_word(&e, yytext); return 0;
-<browse>[0-9]+gg {  
-    fprintf(stderr, "<browse>[0-9]+gg\n");
+<browse>gg               handle_browse_to_begin_of_file(&e, yytext); return 0; 
+<browse>[1-9][0-9]*gg {  
+
     size_t tmp_len  = yyleng - 1;
     char *tmp = calloc((tmp_len), sizeof(char));
     if(tmp)
     {
-        fprintf(stderr, "<browse>[0-9]+gg -- 01\n");
+
         memset(tmp, '\0', tmp_len);
         assert(tmp_len >= yyleng-2);
         strncpy(tmp, yytext, yyleng-2);
-        fprintf(stderr, "<browse>[0-9]+gg -- 02 %s %s\n", yytext, tmp);
+
         int goto_line = atoi(tmp);
         handle_goto_line(&e, goto_line); 
         free(tmp);

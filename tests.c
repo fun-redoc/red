@@ -36,7 +36,7 @@ int test_frame(Editor *initial, void (*testfn)(Editor *e, const char *s), const 
 
     if(EXIT_FAILURE == display_init(&d, 20,20))
     {
-        fprintf(stderr, "ERROR: failed to allocate display.\n");
+
         GOTO_FINISH(1);     
     } 
 
@@ -49,7 +49,7 @@ int test_frame(Editor *initial, void (*testfn)(Editor *e, const char *s), const 
     //int catch_exception = setjmp(try);
     //if(catch_exception==EXIT_FAILURE)
     //{
-    //    fprintf(stderr, "ERROR: caught an error\n");
+
     //    GOTO_FINISH(1);
     //}
 
@@ -120,7 +120,7 @@ int test_delete_line_if_empty_1()
     
     ret_val = test_frame(&tested, handle_delete_insert_mode, NULL, &expected);
 finish:
-    fprintf(stderr, "TRACE: finishing test ret_val==%d\n", ret_val);
+
     editor_free(&tested);
     editor_free(&expected);
     assert(ret_val == 0);
@@ -169,7 +169,7 @@ int test_delete_line_if_empty()
     ret_val = test_frame(&tested, handle_delete_insert_mode, NULL,  &expected);
     
 finish:
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+
     editor_free(&tested);
     editor_free(&expected);
     assert(ret_val == 0);
@@ -274,7 +274,7 @@ int test_insert_in_the_middle_of_a_line()
 
     ret_val = test_frame(&tested, handle_insert_cr, NULL, &expected);
 finish:
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+
     editor_free(&tested);
     editor_free(&expected);
     assert(ret_val == 0);
@@ -330,7 +330,7 @@ int test_backspace_beginn_of_line()
 
     ret_val = test_frame(&tested, handle_backspace_insert_mode, NULL, &expected);
 finish:
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+
     editor_free(&tested);
     editor_free(&expected);
     assert(ret_val == 0);
@@ -385,7 +385,7 @@ int test_delete_line()
 
     ret_val = test_frame(&tested, handle_delete_line_browse_mode, NULL, &expected);
 finish:
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+
     editor_free(&tested);
     editor_free(&expected);
     assert(ret_val == 0);
@@ -443,7 +443,7 @@ int test_insert_behind_capacity()
 
     ret_val = test_frame(&tested, handle_generic_insertmode, "hello", &expected);
 finish:
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+
     editor_free(&tested);
     editor_free(&expected);
     assert(ret_val == 0);
@@ -523,7 +523,7 @@ int test_search_next()
     //expected.crsr.line = 0;
     //ret_val |= test_frame(&tested, handle_search_next, "hallo", &expected);
 finish:
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+
     editor_free(&tested);
     editor_free(&expected);
     assert(ret_val == 0);
@@ -648,7 +648,107 @@ int test_prev_word()
     ret_val = test_frame(&tested, handle_prev_word, NULL, &expected);
     assert(ret_val == 0);
 finish:
-    fprintf(stderr, "TRACE: finishing program ret_val==%d\n", ret_val);
+
+    editor_free(&tested);
+    editor_free(&expected);
+    assert(ret_val == 0);
+    return ret_val;
+}
+
+int test_go_right()
+{
+    int ret_val = 0;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1); // one for terminating \0
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    browse,
+    NULL,
+    0,
+    0,
+    {0,0}, // <- crsrs position
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&tested, "1.123456789");
+    editor_append_line(&tested, "2.123456789");
+    editor_append_line(&tested, "3.123456789");
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    browse,
+    NULL,
+    0,
+    0,
+    {0,1},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&expected, "1.123456789");
+    editor_append_line(&expected, "2.123456789");
+    editor_append_line(&expected, "3.123456789");
+
+    ret_val = test_frame(&tested, handle_go_right, NULL, &expected);
+finish:
+
+    editor_free(&tested);
+    editor_free(&expected);
+    assert(ret_val == 0);
+    return ret_val;
+}
+
+int test_go_to_begin_of_line()
+{
+    int ret_val = 0;
+    const char * test_file = "test.txt";
+    char *fname = malloc(strlen(test_file)+1); // one for terminating \0
+    char *fname1 = malloc(strlen(test_file)+1);
+
+    Editor tested = {
+    strcpy(fname, test_file),
+    browse,
+    NULL,
+    0,
+    0,
+    {0,10}, // <- crsrs position
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&tested, "123456789");
+    editor_append_line(&tested, "123456789");
+    editor_append_line(&tested, "123456789");
+
+    Editor expected = {
+    strcpy(fname1, test_file),
+    browse,
+    NULL,
+    0,
+    0,
+    {0,0},
+    {0,0},
+    NULL,
+    NULL,
+    0,
+    0
+    };
+    editor_append_line(&expected, "123456789");
+    editor_append_line(&expected, "123456789");
+    editor_append_line(&expected, "123456789");
+
+    ret_val = test_frame(&tested, handle_browse_to_begin_of_line, NULL, &expected);
+finish:
+
     editor_free(&tested);
     editor_free(&expected);
     assert(ret_val == 0);
