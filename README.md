@@ -2,19 +2,6 @@
 
 __work is in progress, not yet ready, maybe never near to getting usful__
 
-once in his or her life every programer has to (my subjective pick):
-+ code (imperfect) clones of all the heritage gameslike pong, moonlander, space invaders, tetris, packman 
-+ code an ANN from scratch
-+ code all the algorithms from the art of computer programing in his favourite programing language
-+ create and implement own programing language
-+ code his own code editor
-+ code his own 2d/3d graphics library
-+ code his own haiku or limerick generator
-+ more to come from quantum computing
-
-I'm getting older now, has to hurry up, writing code editor.
-
-
 ## Features
 - display file
 - resize window
